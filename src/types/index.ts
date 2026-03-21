@@ -45,6 +45,7 @@ export interface MonthEntry {
   month: number;
   confirmed: boolean;
   income: IncomeData;
+  customIncome: CustomItem[];       // dynamic user-added income lines
   expenses: ExpenseData;
   gastosExOverride: number | null; // if set, gastosEx = this value; saldo = gastosEx - gastosR
   customExpenses: CustomItem[];     // dynamic user-added expense lines

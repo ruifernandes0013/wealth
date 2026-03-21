@@ -11,6 +11,7 @@ create table if not exists months (
   expenses jsonb default '{}'::jsonb,
   gastos_ex_override numeric(12,2) default null,
   savings jsonb default '{}'::jsonb,
+  custom_income jsonb default '[]'::jsonb,
   custom_expenses jsonb default '[]'::jsonb,
   custom_investments jsonb default '[]'::jsonb,
   hidden_fields jsonb default '[]'::jsonb,
@@ -43,3 +44,4 @@ create policy "Users can manage own year_configs"
 
 -- Migration for existing tables (run if table already exists)
 alter table months add column if not exists hidden_fields jsonb default '[]'::jsonb;
+alter table months add column if not exists custom_income jsonb default '[]'::jsonb;

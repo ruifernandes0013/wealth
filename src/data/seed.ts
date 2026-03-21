@@ -48,6 +48,7 @@ export const seedMonths2026: MonthEntry[] = [
       docbay: 1100,
       receita: 4256.39,
     },
+    customIncome: [],
     expenses: {
       prestacao: 1375.83,
       condObras: 0,
@@ -90,6 +91,7 @@ export const seedMonths2026: MonthEntry[] = [
       docbay: 1100,
       receita: 4246.40,
     },
+    customIncome: [],
     expenses: {
       prestacao: 1375.83,
       condObras: 0,
@@ -132,6 +134,7 @@ export const seedMonths2026: MonthEntry[] = [
       docbay: 1100,
       receita: 4246.39,
     },
+    customIncome: [],
     expenses: {
       prestacao: 1367.97,
       condObras: 0,
@@ -169,6 +172,7 @@ export const seedMonths2026: MonthEntry[] = [
     month,
     confirmed: false,
     income: { ...zeroIncome },
+    customIncome: [] as MonthEntry['customIncome'],
     expenses: { ...zeroExpenses },
     gastosExOverride: 2400.00,
     customExpenses: [] as MonthEntry['customExpenses'],

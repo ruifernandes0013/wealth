@@ -116,6 +116,7 @@ function RestorePill({ label, onRestore }: { label: string; onRestore: () => voi
 
 export default function EditMonthModal({ month, onSave, onClose }: EditMonthModalProps) {
   const [income, setIncome] = useState<IncomeData>({ ...month.income });
+  const [customIncome, setCustomIncome] = useState<CustomItem[]>([...(month.customIncome || [])]);
   const [expenses, setExpenses] = useState<ExpenseData>({ ...month.expenses });
   const [gastosExOverride, setGastosExOverride] = useState<number | null>(month.gastosExOverride);
   const [gastosExInput, setGastosExInput] = useState(month.gastosExOverride != null ? String(month.gastosExOverride) : '');
@@ -131,6 +132,11 @@ export default function EditMonthModal({ month, onSave, onClose }: EditMonthModa
   const updateIncome = useCallback((key: keyof IncomeData, val: number) => setIncome(p => ({ ...p, [key]: val })), []);
   const updateExpense = useCallback((key: keyof ExpenseData, val: number) => setExpenses(p => ({ ...p, [key]: val })), []);
   const updateSavings = useCallback((key: keyof SavingsAllocation, val: number) => setSavings(p => ({ ...p, [key]: val })), []);
+
+  const addCustomIncome = () => setCustomIncome(p => [...p, { id: crypto.randomUUID(), name: '', amount: 0 }]);
+  const updateCustomIncome = (id: string, f: 'name'|'amount', v: string|number) =>
+    setCustomIncome(p => p.map(i => i.id === id ? { ...i, [f]: v } : i));
+  const removeCustomIncome = (id: string) => setCustomIncome(p => p.filter(i => i.id !== id));
 
   const addCustomExpense = () => setCustomExpenses(p => [...p, { id: crypto.randomUUID(), name: '', amount: 0 }]);
   const updateCustomExpense = (id: string, f: 'name'|'amount', v: string|number) =>
@@ -156,7 +162,7 @@ export default function EditMonthModal({ month, onSave, onClose }: EditMonthModa
 
   const handleSave = () => {
     // hidden fields saved as their current value (calculations zero them, UI hides them)
-    onSave({ ...month, income, expenses, gastosExOverride, savings, customExpenses, customInvestments, hiddenFields: Array.from(hiddenFields), confirmed });
+    onSave({ ...month, income, customIncome, expenses, gastosExOverride, savings, customExpenses, customInvestments, hiddenFields: Array.from(hiddenFields), confirmed });
     onClose();
   };
 
@@ -188,13 +194,25 @@ export default function EditMonthModal({ month, onSave, onClose }: EditMonthModa
           {/* ── Income ── */}
           <Section title="Income" accent="emerald" defaultOpen={true}>
             <div className="grid grid-cols-2 gap-3">
+              {/* fixed income fields (with delete/hide) */}
               {(Object.keys(INCOME_LABELS) as (keyof IncomeData)[])
                 .filter(k => !hiddenFields.has(k))
                 .map(key => (
                   <NumField key={key} label={INCOME_LABELS[key]} value={income[key]}
                     onChange={v => updateIncome(key, v)} onDelete={() => hide(key)} />
               ))}
+              {/* custom income items */}
+              {customIncome.map(item => (
+                <CustomRow key={item.id} item={item} onUpdate={updateCustomIncome} onRemove={removeCustomIncome} />
+              ))}
+              <div className="col-span-2">
+                <button type="button" onClick={addCustomIncome}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-sm text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg border border-dashed border-emerald-200 transition-colors">
+                  <Plus className="w-4 h-4" /> Add Income Source
+                </button>
+              </div>
             </div>
+            {/* hidden income restore pills */}
             {hiddenIncomeKeys.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
                 <span className="text-xs text-gray-400">Hidden:</span>

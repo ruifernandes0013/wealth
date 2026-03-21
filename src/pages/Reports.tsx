@@ -15,6 +15,10 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  RadialBarChart,
+  RadialBar,
+  PolarAngleAxis,
+  ReferenceLine,
 } from 'recharts';
 import {
   TrendingUp,
@@ -181,6 +185,56 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+// ─── Savings Rate Gauge ───────────────────────────────────────────────────────
+
+function SavingsGauge({ pct }: { pct: number }) {
+  const clamped = Math.min(Math.max(pct, 0), 100);
+  const fill = clamped >= 60 ? '#10b981' : clamped >= 40 ? '#f59e0b' : '#ef4444';
+  const data = [{ value: clamped, fill }];
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col items-center justify-center">
+      <h3 className="text-sm font-semibold text-gray-700 mb-2">Avg. Savings Rate</h3>
+      <ResponsiveContainer width="100%" height={180}>
+        <RadialBarChart innerRadius="65%" outerRadius="90%" data={data} startAngle={180} endAngle={0} barSize={18}>
+          <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+          <RadialBar background={{ fill: '#f3f4f6' }} dataKey="value" cornerRadius={8} />
+          <text x="50%" y="72%" textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 32, fontWeight: 800, fill: fill }}>
+            {clamped.toFixed(1)}%
+          </text>
+        </RadialBarChart>
+      </ResponsiveContainer>
+      <div className="flex gap-4 text-xs text-gray-400 mt-1">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> ≥60% great</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> ≥40% ok</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> &lt;40% low</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Top Expense Categories ───────────────────────────────────────────────────
+
+function TopExpenses({ data }: { data: {name: string; value: number; color: string}[] }) {
+  const sorted = [...data].filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 10);
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">Top Expense Categories</h3>
+      {sorted.length === 0 ? <p className="text-sm text-gray-400 text-center py-8">No data</p> : (
+        <ResponsiveContainer width="100%" height={Math.max(sorted.length * 32, 200)}>
+          <BarChart data={sorted} layout="vertical" barSize={14} margin={{ left: 8, right: 40, top: 4, bottom: 4 }}>
+            <XAxis type="number" hide tickFormatter={v => `€${(v/1000).toFixed(1)}k`} />
+            <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+            <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: 'right', formatter: (v: number) => formatCurrency(v), fontSize: 11, fill: '#6b7280' }}>
+              {sorted.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
 const MONTH_NAMES_FULL = MONTH_NAMES_FULL_PT;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -198,6 +252,9 @@ export default function Reports() {
 
   // Filter by month range
   const computed = allComputed.filter(m => m.month >= fromMonth && m.month <= toMonth);
+
+  // Also use filteredMonths alias for clarity
+  const filteredMonths = computed;
 
   const handleCurrentMonth = () => {
     const now = new Date();
@@ -255,6 +312,7 @@ export default function Reports() {
     Income: m.calc.cashIn,
     Expenses: m.calc.gastosEx,
     Investments: m.calc.savingsTotal,
+    Saved: m.calc.guardado,
   }));
 
   const savingsRateData = computed.map((m) => ({
@@ -322,6 +380,22 @@ export default function Reports() {
     'Gym / Nutrition': m.expenses.gymNutri,
     'Going Out': m.expenses.saidas,
     Other: m.expenses.outros,
+  }));
+
+  // Investment allocation over time
+  const investmentTimeData = filteredMonths.map(m => {
+    const entry: Record<string, string | number> = { name: MONTH_NAMES_PT[m.month - 1] };
+    (Object.keys(SAVINGS_LABELS) as (keyof SavingsAllocation)[]).forEach(k => {
+      entry[SAVINGS_LABELS[k]] = m.savings[k] || 0;
+    });
+    return entry;
+  });
+
+  // Top expenses data for horizontal bar
+  const topExpensesData = (Object.keys(EXPENSE_LABELS) as (keyof ExpenseData)[]).map((k, i) => ({
+    name: EXPENSE_LABELS[k],
+    value: filteredMonths.reduce((s, m) => s + (m.expenses[k] || 0), 0),
+    color: EXPENSE_COLORS[i % EXPENSE_COLORS.length],
   }));
 
   // Confirmed months table
@@ -516,6 +590,33 @@ export default function Reports() {
         />
       </div>
 
+      {/* ── Distribution Donuts ───────────────────────────────────────────── */}
+      <SectionHeader title="Distribution" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <DonutChart
+          title="Income Sources"
+          data={incomeSources}
+          colors={INCOME_COLORS}
+        />
+        <DonutChart
+          title="Expense Categories"
+          data={expenseCategories}
+          colors={EXPENSE_COLORS}
+        />
+        <DonutChart
+          title="Investment Allocation"
+          data={investmentAllocations}
+          colors={SAVINGS_COLORS}
+        />
+      </div>
+
+      {/* ── Savings Gauge & Top Spending ──────────────────────────────────── */}
+      <SectionHeader title="Savings Gauge & Top Spending" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SavingsGauge pct={avgSavingsRate} />
+        <TopExpenses data={topExpensesData} />
+      </div>
+
       {/* ── Income vs Expenses Bar Chart ─────────────────────────────────── */}
       <SectionHeader title="Income vs. Expenses by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -529,6 +630,100 @@ export default function Reports() {
             <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Investments" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Monthly Savings Amount ────────────────────────────────────────── */}
+      <SectionHeader title="Monthly Savings (Guardado)" />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={monthlyChartData} barSize={22} barCategoryGap="30%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(1)}k`} />
+            <Tooltip content={<CurrencyTooltip />} />
+            <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={2} />
+            <Bar dataKey="Saved" radius={[4, 4, 0, 0]}>
+              {monthlyChartData.map((entry, i) => (
+                <Cell key={i} fill={(entry['Saved'] as number) >= 0 ? '#8b5cf6' : '#ef4444'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Investment Allocation Over Time ───────────────────────────────── */}
+      <SectionHeader title="Investment Allocation Over Time" />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={investmentTimeData} barSize={28} barCategoryGap="25%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(1)}k`} />
+            <Tooltip content={<CurrencyTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {Object.keys(SAVINGS_LABELS).map((key, i, arr) => (
+              <Bar key={key} dataKey={SAVINGS_LABELS[key as keyof SavingsAllocation]} stackId="inv"
+                fill={SAVINGS_COLORS[i % SAVINGS_COLORS.length]}
+                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Property Income Stacked Bar ──────────────────────────────────── */}
+      <SectionHeader title="Property Income by Month" />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={propertyData} barSize={28} barCategoryGap="30%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
+            <Tooltip content={<CurrencyTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 13 }} />
+            <Bar dataKey="Esposende" stackId="a" fill="#10b981" />
+            <Bar dataKey="Felgueiras" stackId="a" fill="#3b82f6" />
+            <Bar dataKey="Fradelos" stackId="a" fill="#f59e0b" />
+            <Bar dataKey="DocBay" stackId="a" fill="#8b5cf6" />
+            <Bar dataKey="Other Income" stackId="a" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Expense Breakdown Stacked Bar ───────────────────────────────── */}
+      <SectionHeader title="Expense Breakdown by Month" />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
+        <ResponsiveContainer width="100%" height={350}>
+          <BarChart data={expenseBreakdownData} barSize={32} barCategoryGap="25%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
+            <Tooltip content={<CurrencyTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {[
+              { key: 'Mortgage', color: '#ef4444' },
+              { key: 'Condo / Works', color: '#f97316' },
+              { key: 'Water', color: '#eab308' },
+              { key: 'Electricity', color: '#84cc16' },
+              { key: 'Internet', color: '#10b981' },
+              { key: 'Diesel', color: '#06b6d4' },
+              { key: 'Food', color: '#3b82f6' },
+              { key: 'Mechanic', color: '#8b5cf6' },
+              { key: 'Netflix', color: '#ec4899' },
+              { key: 'Phone', color: '#14b8a6' },
+              { key: 'Gym / Nutrition', color: '#f43f5e' },
+              { key: 'Going Out', color: '#a855f7' },
+              { key: 'Other', color: '#6366f1' },
+            ].map(({ key, color }, i, arr) => (
+              <Bar
+                key={key}
+                dataKey={key}
+                stackId="b"
+                fill={color}
+                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -608,82 +803,6 @@ export default function Reports() {
               dot={{ r: 4, fill: '#8b5cf6' }}
             />
           </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Donut Charts ────────────────────────────────────────────────────── */}
-      <SectionHeader title="Distribution" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <DonutChart
-          title="Income Sources"
-          data={incomeSources}
-          colors={INCOME_COLORS}
-        />
-        <DonutChart
-          title="Expense Categories"
-          data={expenseCategories}
-          colors={EXPENSE_COLORS}
-        />
-        <DonutChart
-          title="Investment Allocation"
-          data={investmentAllocations}
-          colors={SAVINGS_COLORS}
-        />
-      </div>
-
-      {/* ── Property Income Stacked Bar ──────────────────────────────────── */}
-      <SectionHeader title="Property Income by Month" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={propertyData} barSize={28} barCategoryGap="30%">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Bar dataKey="Esposende" stackId="a" fill="#10b981" />
-            <Bar dataKey="Felgueiras" stackId="a" fill="#3b82f6" />
-            <Bar dataKey="Fradelos" stackId="a" fill="#f59e0b" />
-            <Bar dataKey="DocBay" stackId="a" fill="#8b5cf6" />
-            <Bar dataKey="Other Income" stackId="a" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Expense Breakdown Stacked Bar ───────────────────────────────── */}
-      <SectionHeader title="Expense Breakdown by Month" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={expenseBreakdownData} barSize={32} barCategoryGap="25%">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {[
-              { key: 'Mortgage', color: '#ef4444' },
-              { key: 'Condo / Works', color: '#f97316' },
-              { key: 'Water', color: '#eab308' },
-              { key: 'Electricity', color: '#84cc16' },
-              { key: 'Internet', color: '#10b981' },
-              { key: 'Diesel', color: '#06b6d4' },
-              { key: 'Food', color: '#3b82f6' },
-              { key: 'Mechanic', color: '#8b5cf6' },
-              { key: 'Netflix', color: '#ec4899' },
-              { key: 'Phone', color: '#14b8a6' },
-              { key: 'Gym / Nutrition', color: '#f43f5e' },
-              { key: 'Going Out', color: '#a855f7' },
-              { key: 'Other', color: '#6366f1' },
-            ].map(({ key, color }, i, arr) => (
-              <Bar
-                key={key}
-                dataKey={key}
-                stackId="b"
-                fill={color}
-                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-              />
-            ))}
-          </BarChart>
         </ResponsiveContainer>
       </div>
 

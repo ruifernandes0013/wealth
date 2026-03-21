@@ -11,9 +11,10 @@ export function sumObject(obj: Record<string, number>): number {
 export function calcMonth(entry: MonthEntry): MonthCalculations {
   const hidden = new Set(entry.hiddenFields || []);
 
+  const customIncomeSum = (entry.customIncome || []).reduce((s, i) => s + i.amount, 0);
   const cashIn = Object.entries(entry.income).reduce(
     (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
-  );
+  ) + customIncomeSum;
   const fixedExpenses = Object.entries(entry.expenses).reduce(
     (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
   );
