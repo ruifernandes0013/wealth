@@ -652,7 +652,7 @@ export default function Monthly() {
                       ))}
                     </SortableContext>
                   </DndContext>
-                  <th className="sticky right-0 z-10 bg-emerald-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-emerald-500">TOTAL</th>
+                  <th className="bg-emerald-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-emerald-500">TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -672,7 +672,7 @@ export default function Monthly() {
                         const val = item?.amount ?? 0;
                         return EC(m, 'income', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`sticky right-0 z-10 px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-emerald-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-emerald-50 text-emerald-300' : 'bg-white text-emerald-700'}`}>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-emerald-100 ${isProjected ? 'text-emerald-300' : 'text-emerald-700'}`}>
                         {formatCurrency(m.calc.cashIn)}
                       </td>
                     </tr>
@@ -683,7 +683,7 @@ export default function Monthly() {
                 <tr className="bg-emerald-700 text-white font-bold border-t-2 border-emerald-400">
                   <td className="sticky left-0 z-10 bg-emerald-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-emerald-500">TOTAL</td>
                   {incomeNames.map(name => <td key={name} />)}
-                  <td className="sticky right-0 z-10 bg-emerald-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-emerald-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
+                  <td className="bg-emerald-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-emerald-500">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.cashIn, 0))}
                   </td>
                 </tr>
@@ -717,7 +717,7 @@ export default function Monthly() {
                       ))}
                     </SortableContext>
                   </DndContext>
-                  <th className="sticky right-0 z-10 bg-red-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-red-500">TOTAL</th>
+                  <th className="bg-red-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-red-500">TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -737,7 +737,7 @@ export default function Monthly() {
                         const val = item?.amount ?? 0;
                         return EC(m, 'expenses', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`sticky right-0 z-10 px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-red-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-red-50 text-red-300' : 'bg-white text-red-700'}`}>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-red-100 ${isProjected ? 'text-red-300' : 'text-red-700'}`}>
                         {formatCurrency(m.calc.gastosR)}
                       </td>
                     </tr>
@@ -748,7 +748,7 @@ export default function Monthly() {
                 <tr className="bg-red-700 text-white font-bold border-t-2 border-red-400">
                   <td className="sticky left-0 z-10 bg-red-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-red-500">TOTAL</td>
                   {expenseNames.map(name => <td key={name} />)}
-                  <td className="sticky right-0 z-10 bg-red-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-red-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
+                  <td className="bg-red-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-red-500">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.gastosR, 0))}
                   </td>
                 </tr>
@@ -782,7 +782,7 @@ export default function Monthly() {
                       ))}
                     </SortableContext>
                   </DndContext>
-                  <th className="sticky right-0 z-10 bg-violet-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-violet-500">TOTAL</th>
+                  <th className="bg-violet-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-violet-500">TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -802,7 +802,7 @@ export default function Monthly() {
                         const val = item?.amount ?? 0;
                         return EC(m, 'investments', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`sticky right-0 z-10 px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-violet-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-violet-50 text-violet-300' : 'bg-white text-violet-700'}`}>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-violet-100 ${isProjected ? 'text-violet-300' : 'text-violet-700'}`}>
                         {formatCurrency(m.calc.savingsTotal)}
                       </td>
                     </tr>
@@ -813,7 +813,7 @@ export default function Monthly() {
                 <tr className="bg-violet-700 text-white font-bold border-t-2 border-violet-400">
                   <td className="sticky left-0 z-10 bg-violet-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-violet-500">TOTAL</td>
                   {investmentNames.map(name => <td key={name} />)}
-                  <td className="sticky right-0 z-10 bg-violet-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-violet-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
+                  <td className="bg-violet-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-violet-500">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.savingsTotal, 0))}
                   </td>
                 </tr>
