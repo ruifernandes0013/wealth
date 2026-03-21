@@ -30,7 +30,7 @@ import { useData } from '../context/DataContext';
 import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
 import StatCard from '../components/StatCard';
-import { MONTH_NAMES_PT, EXPENSE_LABELS, INCOME_LABELS, SAVINGS_LABELS } from '../types';
+import { MONTH_NAMES_PT, MONTH_NAMES_FULL_PT, EXPENSE_LABELS, INCOME_LABELS, SAVINGS_LABELS } from '../types';
 import type { ExpenseData, IncomeData, SavingsAllocation } from '../types';
 
 // ─── Color Palettes ───────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ function DonutChart({ data, colors, title }: DonutProps) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">{title}</h3>
       {filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">Sem dados</p>
+        <p className="text-sm text-gray-400 text-center py-8">No data</p>
       ) : (
         <div className="flex gap-4 flex-col">
           <ResponsiveContainer width="100%" height={200}>
@@ -181,10 +181,7 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-const MONTH_NAMES_FULL = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-];
+const MONTH_NAMES_FULL = MONTH_NAMES_FULL_PT;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -255,24 +252,24 @@ export default function Reports() {
 
   const monthlyChartData = computed.map((m) => ({
     name: MONTH_NAMES_PT[m.month - 1],
-    Receitas: m.calc.cashIn,
-    Despesas: m.calc.gastosEx,
-    Investimentos: m.calc.savingsTotal,
+    Income: m.calc.cashIn,
+    Expenses: m.calc.gastosEx,
+    Investments: m.calc.savingsTotal,
   }));
 
   const savingsRateData = computed.map((m) => ({
     name: MONTH_NAMES_PT[m.month - 1],
-    'Taxa de Poupança': m.calc.savingsPct,
+    'Savings Rate': m.calc.savingsPct,
   }));
 
   const balanceData = computed.map((m) => ({
     name: MONTH_NAMES_PT[m.month - 1],
-    'Saldo Bancário': m.totalBalance,
+    'Bank Balance': m.totalBalance,
   }));
 
   const anoData = computed.map((m) => ({
     name: MONTH_NAMES_PT[m.month - 1],
-    Guardado: m.ano,
+    Saved: m.ano,
   }));
 
   // Income sources donut
@@ -306,25 +303,25 @@ export default function Reports() {
     Felgueiras: m.income.felgueiras,
     Fradelos: m.income.fradelos,
     DocBay: m.income.docbay,
-    Receita: m.income.receita,
+    'Other Income': m.income.receita,
   }));
 
   // Expense breakdown stacked bar
   const expenseBreakdownData = computed.map((m) => ({
     name: MONTH_NAMES_PT[m.month - 1],
-    Prestação: m.expenses.prestacao,
-    'Cond/Obras': m.expenses.condObras,
-    Água: m.expenses.agua,
-    Luz: m.expenses.luz,
+    Mortgage: m.expenses.prestacao,
+    'Condo / Works': m.expenses.condObras,
+    Water: m.expenses.agua,
+    Electricity: m.expenses.luz,
     Internet: m.expenses.internet,
-    Gasóleo: m.expenses.gasoleo,
-    Alimentação: m.expenses.alimentacao,
-    Mecânico: m.expenses.mecanico,
+    Diesel: m.expenses.gasoleo,
+    Food: m.expenses.alimentacao,
+    Mechanic: m.expenses.mecanico,
     Netflix: m.expenses.netflix,
-    Telefone: m.expenses.telefone,
-    'Gym/Nutri': m.expenses.gymNutri,
-    Saídas: m.expenses.saidas,
-    Outros: m.expenses.outros,
+    Phone: m.expenses.telefone,
+    'Gym / Nutrition': m.expenses.gymNutri,
+    'Going Out': m.expenses.saidas,
+    Other: m.expenses.outros,
   }));
 
   // Confirmed months table
@@ -338,9 +335,9 @@ export default function Reports() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Análise detalhada das finanças
+            Detailed financial analysis
           </p>
         </div>
         {/* Filter bar */}
@@ -362,7 +359,7 @@ export default function Reports() {
           </div>
           {/* From month */}
           <div className="flex items-center gap-1.5">
-            <span className="text-sm text-gray-500">De:</span>
+            <span className="text-sm text-gray-500">From:</span>
             <select
               value={fromMonth}
               onChange={(e) => {
@@ -379,7 +376,7 @@ export default function Reports() {
           </div>
           {/* To month */}
           <div className="flex items-center gap-1.5">
-            <span className="text-sm text-gray-500">Até:</span>
+            <span className="text-sm text-gray-500">To:</span>
             <select
               value={toMonth}
               onChange={(e) => {
@@ -399,14 +396,14 @@ export default function Reports() {
             onClick={handleCurrentMonth}
             className="px-3 py-2 text-sm font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg transition-colors"
           >
-            Mês actual
+            Current Month
           </button>
           {/* Reset to full year */}
           <button
             onClick={() => { setFromMonth(1); setToMonth(12); }}
             className="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
           >
-            Ano completo
+            Full Year
           </button>
         </div>
       </div>
@@ -414,31 +411,31 @@ export default function Reports() {
       {/* ── Summary Stat Cards ────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
-          title="Receitas"
+          title="Income"
           value={formatCurrency(totalIncome)}
           icon={<TrendingUp className="w-5 h-5 text-emerald-600" />}
           colorClass="text-emerald-600"
         />
         <StatCard
-          title="Despesas"
+          title="Expenses"
           value={formatCurrency(totalExpenses)}
           icon={<TrendingDown className="w-5 h-5 text-red-500" />}
           colorClass="text-red-600"
         />
         <StatCard
-          title="Guardado"
+          title="Saved"
           value={formatCurrency(totalSaved)}
           icon={<PiggyBank className="w-5 h-5 text-violet-600" />}
           colorClass="text-violet-600"
         />
         <StatCard
-          title="Taxa de Poupança Média"
+          title="Avg. Savings Rate"
           value={formatPct(avgSavingsRate)}
           icon={<Percent className="w-5 h-5 text-blue-500" />}
           colorClass="text-blue-600"
         />
         <StatCard
-          title="Melhor Mês"
+          title="Best Month"
           value={
             bestMonth
               ? `${MONTH_NAMES_PT[(bestMonth.month ?? 1) - 1]} ${formatPct(bestMonth.calc.savingsPct)}`
@@ -448,7 +445,7 @@ export default function Reports() {
           colorClass="text-yellow-600"
         />
         <StatCard
-          title="Saldo Bancário"
+          title="Bank Balance"
           value={formatCurrency(lastBalance)}
           icon={<Landmark className="w-5 h-5 text-blue-600" />}
           colorClass={lastBalance >= 0 ? 'text-blue-600' : 'text-red-600'}
@@ -458,31 +455,31 @@ export default function Reports() {
       {/* ── Additional Stat Cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Receita Mensal Média"
+          title="Avg. Monthly Income"
           value={formatCurrency(avgMonthlyIncome)}
           colorClass="text-emerald-600"
-          subtitle="Média simples todos os meses"
+          subtitle="Simple average all months"
         />
         <StatCard
-          title="Despesa Mensal Média"
+          title="Avg. Monthly Expenses"
           value={formatCurrency(avgMonthlyExpenses)}
           colorClass="text-red-600"
-          subtitle="Média simples todos os meses"
+          subtitle="Simple average all months"
         />
         <StatCard
-          title="Investimento Mensal Médio"
+          title="Avg. Monthly Investment"
           value={formatCurrency(avgMonthlySavings)}
           colorClass="text-violet-600"
-          subtitle="Guardado médio por mês"
+          subtitle="Average saved per month"
         />
         <StatCard
-          title="Meses com >60% Taxa"
+          title="Months with >60% Rate"
           value={String(monthsAbove60)}
           colorClass="text-emerald-600"
-          subtitle={`de ${computed.length} meses`}
+          subtitle={`of ${computed.length} months`}
         />
         <StatCard
-          title="Maior Categoria de Despesa"
+          title="Biggest Expense Category"
           value={
             biggestExpenseKey
               ? EXPENSE_LABELS[biggestExpenseKey]
@@ -496,31 +493,31 @@ export default function Reports() {
           }
         />
         <StatCard
-          title="Meses Confirmados"
+          title="Confirmed Months"
           value={`${confirmedMonths.length} / ${computed.length}`}
           colorClass="text-emerald-600"
-          subtitle="Dados reais vs projecção"
+          subtitle="Real data vs projection"
         />
         <StatCard
-          title="Saldo Inicial"
+          title="Opening Balance"
           value={formatCurrency(yearConfig.initialBalance)}
           colorClass="text-blue-600"
-          subtitle={`Início de ${selectedYear}`}
+          subtitle={`Start of ${selectedYear}`}
         />
         <StatCard
-          title="Variação de Saldo"
+          title="Balance Change"
           value={formatCurrency(lastBalance - yearConfig.initialBalance)}
           colorClass={
             lastBalance - yearConfig.initialBalance >= 0
               ? 'text-emerald-600'
               : 'text-red-600'
           }
-          subtitle="Saldo final - saldo inicial"
+          subtitle="Final balance - opening balance"
         />
       </div>
 
       {/* ── Income vs Expenses Bar Chart ─────────────────────────────────── */}
-      <SectionHeader title="Receitas vs. Despesas por Mês" />
+      <SectionHeader title="Income vs. Expenses by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={monthlyChartData} barSize={18} barCategoryGap="25%">
@@ -529,15 +526,15 @@ export default function Reports() {
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Investimentos" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Investments" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* ── Savings Rate Line ────────────────────────────────────────────── */}
-      <SectionHeader title="Taxa de Poupança por Mês" />
+      <SectionHeader title="Savings Rate by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <ResponsiveContainer width="100%" height={250}>
           <LineChart data={savingsRateData}>
@@ -548,7 +545,7 @@ export default function Reports() {
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Line
               type="monotone"
-              dataKey="Taxa de Poupança"
+              dataKey="Savings Rate"
               stroke="#8b5cf6"
               strokeWidth={2.5}
               dot={{ r: 4, fill: '#8b5cf6' }}
@@ -559,7 +556,7 @@ export default function Reports() {
       </div>
 
       {/* ── Bank Balance Line ─────────────────────────────────────────────── */}
-      <SectionHeader title="Evolução do Saldo Bancário (TOTAL)" />
+      <SectionHeader title="Bank Balance Over Time (TOTAL)" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={balanceData}>
@@ -576,7 +573,7 @@ export default function Reports() {
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Area
               type="monotone"
-              dataKey="Saldo Bancário"
+              dataKey="Bank Balance"
               stroke="#3b82f6"
               strokeWidth={2.5}
               fill="url(#balanceGrad)"
@@ -587,7 +584,7 @@ export default function Reports() {
       </div>
 
       {/* ── Cumulative Savings Area ───────────────────────────────────────── */}
-      <SectionHeader title="Poupança Acumulada no Ano (ANO)" />
+      <SectionHeader title="Cumulative Savings for the Year (YTD)" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={anoData}>
@@ -604,7 +601,7 @@ export default function Reports() {
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Area
               type="monotone"
-              dataKey="Guardado"
+              dataKey="Saved"
               stroke="#8b5cf6"
               strokeWidth={2.5}
               fill="url(#anoGrad)"
@@ -615,27 +612,27 @@ export default function Reports() {
       </div>
 
       {/* ── Donut Charts ────────────────────────────────────────────────────── */}
-      <SectionHeader title="Distribuição" />
+      <SectionHeader title="Distribution" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <DonutChart
-          title="Fontes de Rendimento"
+          title="Income Sources"
           data={incomeSources}
           colors={INCOME_COLORS}
         />
         <DonutChart
-          title="Categorias de Despesa"
+          title="Expense Categories"
           data={expenseCategories}
           colors={EXPENSE_COLORS}
         />
         <DonutChart
-          title="Alocação de Investimentos"
+          title="Investment Allocation"
           data={investmentAllocations}
           colors={SAVINGS_COLORS}
         />
       </div>
 
       {/* ── Property Income Stacked Bar ──────────────────────────────────── */}
-      <SectionHeader title="Rendimentos por Propriedade por Mês" />
+      <SectionHeader title="Property Income by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={propertyData} barSize={28} barCategoryGap="30%">
@@ -648,13 +645,13 @@ export default function Reports() {
             <Bar dataKey="Felgueiras" stackId="a" fill="#3b82f6" />
             <Bar dataKey="Fradelos" stackId="a" fill="#f59e0b" />
             <Bar dataKey="DocBay" stackId="a" fill="#8b5cf6" />
-            <Bar dataKey="Receita" stackId="a" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Other Income" stackId="a" fill="#06b6d4" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* ── Expense Breakdown Stacked Bar ───────────────────────────────── */}
-      <SectionHeader title="Decomposição de Despesas por Mês" />
+      <SectionHeader title="Expense Breakdown by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={expenseBreakdownData} barSize={32} barCategoryGap="25%">
@@ -664,19 +661,19 @@ export default function Reports() {
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {[
-              { key: 'Prestação', color: '#ef4444' },
-              { key: 'Cond/Obras', color: '#f97316' },
-              { key: 'Água', color: '#eab308' },
-              { key: 'Luz', color: '#84cc16' },
+              { key: 'Mortgage', color: '#ef4444' },
+              { key: 'Condo / Works', color: '#f97316' },
+              { key: 'Water', color: '#eab308' },
+              { key: 'Electricity', color: '#84cc16' },
               { key: 'Internet', color: '#10b981' },
-              { key: 'Gasóleo', color: '#06b6d4' },
-              { key: 'Alimentação', color: '#3b82f6' },
-              { key: 'Mecânico', color: '#8b5cf6' },
+              { key: 'Diesel', color: '#06b6d4' },
+              { key: 'Food', color: '#3b82f6' },
+              { key: 'Mechanic', color: '#8b5cf6' },
               { key: 'Netflix', color: '#ec4899' },
-              { key: 'Telefone', color: '#14b8a6' },
-              { key: 'Gym/Nutri', color: '#f43f5e' },
-              { key: 'Saídas', color: '#a855f7' },
-              { key: 'Outros', color: '#6366f1' },
+              { key: 'Phone', color: '#14b8a6' },
+              { key: 'Gym / Nutrition', color: '#f43f5e' },
+              { key: 'Going Out', color: '#a855f7' },
+              { key: 'Other', color: '#6366f1' },
             ].map(({ key, color }, i, arr) => (
               <Bar
                 key={key}
@@ -693,15 +690,15 @@ export default function Reports() {
       {/* ── Custom Investments Breakdown ─────────────────────────────────── */}
       {hasCustomInvestments && (
         <>
-          <SectionHeader title="Investimentos Adicionais por Mês" />
+          <SectionHeader title="Additional Investments by Month" />
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Mês</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Descrição</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Month</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -728,23 +725,23 @@ export default function Reports() {
       {/* ── Confirmed Months Summary Table ──────────────────────────────── */}
       {confirmedMonths.length > 0 && (
         <>
-          <SectionHeader title="Resumo — Meses Confirmados" />
+          <SectionHeader title="Summary — Confirmed Months" />
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto scrollbar-thin">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     {[
-                      'Mês',
-                      'Receita',
+                      'Month',
+                      'Income',
                       'G.R.',
                       'G.EX.',
-                      'Investimentos',
+                      'Investments',
                       'Cash Out',
-                      'Guardado',
+                      'Saved',
                       '(%)',
-                      'ANO',
-                      'Saldo',
+                      'YTD',
+                      'Balance',
                     ].map((h) => (
                       <th
                         key={h}

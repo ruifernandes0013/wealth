@@ -26,7 +26,7 @@ export default function Login() {
             <TrendingUp className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Wealth Manager</h1>
-          <p className="text-gray-400 text-sm mt-1">Aceda à sua conta</p>
+          <p className="text-gray-400 text-sm mt-1">Sign in to your account</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -37,7 +37,7 @@ export default function Login() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-              placeholder="email@exemplo.com"
+              placeholder="you@example.com"
             />
           </div>
           <div>
@@ -61,7 +61,7 @@ export default function Login() {
             disabled={loading}
             className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors"
           >
-            {loading ? 'A entrar...' : 'Entrar'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
       </div>

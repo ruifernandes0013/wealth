@@ -2,9 +2,6 @@ import type {
   MonthEntry,
   MonthCalculations,
   MonthWithCalc,
-  IncomeData,
-  ExpenseData,
-  SavingsAllocation,
 } from '../types';
 
 export function sumObject(obj: Record<string, number>): number {
@@ -12,13 +9,21 @@ export function sumObject(obj: Record<string, number>): number {
 }
 
 export function calcMonth(entry: MonthEntry): MonthCalculations {
-  const cashIn = sumObject(entry.income as unknown as Record<string, number>);
-  const fixedExpenses = sumObject(entry.expenses as unknown as Record<string, number>);
+  const hidden = new Set(entry.hiddenFields || []);
+
+  const cashIn = Object.entries(entry.income).reduce(
+    (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
+  );
+  const fixedExpenses = Object.entries(entry.expenses).reduce(
+    (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
+  );
   const customExpSum = (entry.customExpenses || []).reduce((s, i) => s + i.amount, 0);
   const gastosR = fixedExpenses + customExpSum;
   const gastosEx = entry.gastosExOverride != null ? entry.gastosExOverride : gastosR;
   const saldo = gastosEx - gastosR;
-  const fixedSavings = sumObject(entry.savings as unknown as Record<string, number>);
+  const fixedSavings = Object.entries(entry.savings).reduce(
+    (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
+  );
   const customInvSum = (entry.customInvestments || []).reduce((s, i) => s + i.amount, 0);
   const savingsTotal = fixedSavings + customInvSum;
   const cashOut = gastosEx + savingsTotal;
@@ -49,45 +54,4 @@ export function calcYearMonths(
       totalBalance: runningBalance,
     };
   });
-}
-
-export function sumIncome(income: IncomeData): number {
-  return (
-    income.esposende +
-    income.felgueiras +
-    income.fradelos +
-    income.docbay +
-    income.receita
-  );
-}
-
-export function sumExpenses(expenses: ExpenseData): number {
-  return (
-    expenses.prestacao +
-    expenses.condObras +
-    expenses.agua +
-    expenses.luz +
-    expenses.internet +
-    expenses.gasoleo +
-    expenses.alimentacao +
-    expenses.mecanico +
-    expenses.netflix +
-    expenses.telefone +
-    expenses.gymNutri +
-    expenses.saidas +
-    expenses.outros
-  );
-}
-
-export function sumSavings(savings: SavingsAllocation): number {
-  return (
-    savings.contas +
-    savings.ferias +
-    savings.t1Felgueiras +
-    savings.t1Esposende +
-    savings.t1Fradelos +
-    savings.casamento +
-    savings.stockMarket +
-    savings.ouro
-  );
 }

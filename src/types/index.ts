@@ -50,6 +50,7 @@ export interface MonthEntry {
   customExpenses: CustomItem[];     // dynamic user-added expense lines
   customInvestments: CustomItem[];  // dynamic user-added investment lines
   savings: SavingsAllocation;
+  hiddenFields: string[];           // tracks which fixed field keys are hidden/zeroed per month
 }
 
 export interface YearConfig {
@@ -85,42 +86,42 @@ export const INCOME_LABELS: Record<keyof IncomeData, string> = {
   felgueiras: 'Felgueiras',
   fradelos: 'Fradelos',
   docbay: 'DocBay',
-  receita: 'Receita',
+  receita: 'Other Income',
 };
 
 export const EXPENSE_LABELS: Record<keyof ExpenseData, string> = {
-  prestacao: 'Prestação',
-  condObras: 'Cond/Obras',
-  agua: 'Água',
-  luz: 'Luz',
+  prestacao: 'Mortgage',
+  condObras: 'Condo / Works',
+  agua: 'Water',
+  luz: 'Electricity',
   internet: 'Internet',
-  gasoleo: 'Gasóleo',
-  alimentacao: 'Alimentação',
-  mecanico: 'Mecânico',
+  gasoleo: 'Diesel',
+  alimentacao: 'Food',
+  mecanico: 'Mechanic',
   netflix: 'Netflix',
-  telefone: 'Telefone',
-  gymNutri: 'Gym/Nutri',
-  saidas: 'Saídas',
-  outros: 'Outros',
+  telefone: 'Phone',
+  gymNutri: 'Gym / Nutrition',
+  saidas: 'Going Out',
+  outros: 'Other',
 };
 
 export const SAVINGS_LABELS: Record<keyof SavingsAllocation, string> = {
-  contas: 'Contas',
-  ferias: 'Férias',
+  contas: 'Savings Acc.',
+  ferias: 'Holidays',
   t1Felgueiras: 'T1 Felgueiras',
   t1Esposende: 'T1 Esposende',
   t1Fradelos: 'T1 Fradelos',
-  casamento: 'Casamento',
+  casamento: 'Wedding',
   stockMarket: 'Stock Market',
-  ouro: 'Ouro',
+  ouro: 'Gold',
 };
 
 export const MONTH_NAMES_PT = [
-  'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN',
-  'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ',
+  'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+  'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
 ];
 
 export const MONTH_NAMES_FULL_PT = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
