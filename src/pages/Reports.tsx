@@ -815,6 +815,120 @@ export default function Reports() {
         })()}
       </div>
 
+      {/* ── Financial Goals & Action Plan ────────────────────────────────── */}
+      <SectionHeader title="Financial Goals & Action Plan" />
+      {computed.length > 0 && (() => {
+        interface Goal {
+          status: 'achieved' | 'on-track' | 'improve' | 'urgent';
+          title: string;
+          description: string;
+          action: string;
+          current: string;
+          target: string;
+        }
+
+        const goals: Goal[] = [];
+
+        // 1. Emergency Runway
+        if (runway >= 12) {
+          goals.push({ status: 'achieved', title: 'Emergency Runway', current: `${runway.toFixed(1)} months`, target: '≥ 12 months', description: `You have ${runway.toFixed(1)} months of expenses covered — excellent safety net.`, action: 'Consider moving excess reserves into higher-yield investments.' });
+        } else if (runway >= 6) {
+          const needed = avgMonthlyExpenses * 12 - lastBalance;
+          goals.push({ status: 'on-track', title: 'Emergency Runway', current: `${runway.toFixed(1)} months`, target: '12 months', description: `Good buffer, but target is 12 months.`, action: `Save ${formatCurrency(needed)} more to reach a full 12-month safety net.` });
+        } else {
+          const needed = avgMonthlyExpenses * 6 - lastBalance;
+          goals.push({ status: 'urgent', title: 'Emergency Runway', current: `${runway.toFixed(1)} months`, target: '≥ 6 months', description: `Your runway is critically low — a job loss or emergency could be serious.`, action: `Build ${formatCurrency(Math.max(needed, 0))} in reserves to reach the 6-month minimum.` });
+        }
+
+        // 2. Savings Rate
+        if (avgSavingsRate >= 60) {
+          goals.push({ status: 'achieved', title: 'Savings Rate', current: formatPct(avgSavingsRate), target: '≥ 60%', description: 'Outstanding savings discipline — you are in wealth-building territory.', action: 'Direct surplus into diversified investments to compound returns.' });
+        } else if (avgSavingsRate >= 40) {
+          const extraNeeded = (60 - avgSavingsRate) / 100 * avgMonthlyIncome;
+          goals.push({ status: 'on-track', title: 'Savings Rate', current: formatPct(avgSavingsRate), target: '60%', description: 'Good rate, but 60%+ is where serious wealth is built.', action: `Find ${formatCurrency(extraNeeded)}/month more to save through small cuts or income growth.` });
+        } else if (avgSavingsRate >= 20) {
+          const extraNeeded = (40 - avgSavingsRate) / 100 * avgMonthlyIncome;
+          goals.push({ status: 'improve', title: 'Savings Rate', current: formatPct(avgSavingsRate), target: '40%', description: 'Acceptable but there is significant room to improve.', action: `Increase savings by ${formatCurrency(extraNeeded)}/month — review top expense categories.` });
+        } else {
+          const extraNeeded = (20 - avgSavingsRate) / 100 * avgMonthlyIncome;
+          goals.push({ status: 'urgent', title: 'Savings Rate', current: formatPct(avgSavingsRate), target: '20%', description: 'Savings rate is below the minimum recommended level.', action: `Start by saving ${formatCurrency(extraNeeded)}/month more. Cut discretionary spending first.` });
+        }
+
+        // 3. Expense Ratio
+        if (expenseRatio <= 40) {
+          goals.push({ status: 'achieved', title: 'Expense Ratio', current: `${expenseRatio.toFixed(1)}%`, target: '≤ 40%', description: 'Expenses are well under control relative to income.', action: 'Maintain discipline and watch for lifestyle inflation.' });
+        } else if (expenseRatio <= 60) {
+          const overBy = (expenseRatio - 40) / 100 * totalIncome;
+          goals.push({ status: 'improve', title: 'Expense Ratio', current: `${expenseRatio.toFixed(1)}%`, target: '40%', description: 'Expenses are eating a large share of income.', action: `Reduce total expenses by ${formatCurrency(overBy / Math.max(computed.length, 1))}/month to hit the 40% target.` });
+        } else {
+          const overBy = (expenseRatio - 40) / 100 * totalIncome;
+          goals.push({ status: 'urgent', title: 'Expense Ratio', current: `${expenseRatio.toFixed(1)}%`, target: '≤ 40%', description: 'Most of your income goes to expenses — very little room to build wealth.', action: `Cut ${formatCurrency(overBy / Math.max(computed.length, 1))}/month in expenses. Start with the biggest category.` });
+        }
+
+        // 4. Coverage Ratio
+        if (coverageRatio >= 2.5) {
+          goals.push({ status: 'achieved', title: 'Income Coverage', current: `${coverageRatio.toFixed(2)}×`, target: '≥ 2.5×', description: 'Income comfortably covers expenses with strong headroom.', action: 'Use the surplus to accelerate debt paydown or investment.' });
+        } else if (coverageRatio >= 1.5) {
+          goals.push({ status: 'improve', title: 'Income Coverage', current: `${coverageRatio.toFixed(2)}×`, target: '2.5×', description: 'Income covers expenses but the margin is thin.', action: `Grow income or cut expenses to reach ${formatCurrency(avgMonthlyExpenses * 2.5)}/month income target.` });
+        } else {
+          goals.push({ status: 'urgent', title: 'Income Coverage', current: `${coverageRatio.toFixed(2)}×`, target: '≥ 1.5×', description: 'Income barely covers expenses — you are financially exposed.', action: 'Prioritise increasing income streams. Look for rental, freelance, or raise opportunities.' });
+        }
+
+        // 5. Biggest expense category
+        if (biggestExpenseName) {
+          const biggestTotal = expenseSumByName[biggestExpenseName];
+          const biggestPct = totalExpenses > 0 ? (biggestTotal / totalExpenses) * 100 : 0;
+          if (biggestPct > 40) {
+            goals.push({ status: 'improve', title: 'Expense Concentration', current: `${biggestExpenseName} = ${biggestPct.toFixed(0)}% of expenses`, target: '< 40% in any category', description: `"${biggestExpenseName}" dominates your spending at ${formatCurrency(biggestTotal)}.`, action: `Audit "${biggestExpenseName}". Even a 10% reduction saves ${formatCurrency(biggestTotal * 0.1 / Math.max(computed.length, 1))}/month.` });
+          } else {
+            goals.push({ status: 'achieved', title: 'Expense Diversification', current: `${biggestExpenseName} = ${biggestPct.toFixed(0)}%`, target: '< 40% any category', description: 'No single expense dominates your budget — well balanced.', action: 'Continue monitoring for any category that starts to grow disproportionately.' });
+          }
+        }
+
+        // 6. Consistency: months with low savings rate
+        const lowMonths = computed.filter(m => m.confirmed && m.calc.savingsPct < 20).length;
+        const confirmedTotal = computed.filter(m => m.confirmed).length;
+        if (confirmedTotal > 0 && lowMonths === 0) {
+          goals.push({ status: 'achieved', title: 'Consistency', current: '0 low months', target: 'No months below 20%', description: 'Every confirmed month has been above 20% savings rate.', action: 'Aim to eliminate months below 40% next.' });
+        } else if (lowMonths > 0) {
+          goals.push({ status: lowMonths >= 3 ? 'urgent' : 'improve', title: 'Consistency', current: `${lowMonths} month${lowMonths > 1 ? 's' : ''} below 20%`, target: '0 months below 20%', description: `${lowMonths} confirmed month${lowMonths > 1 ? 's' : ''} had a savings rate under 20%.`, action: 'Identify what happened in those months and set a monthly spending budget to prevent it.' });
+        }
+
+        const colors = {
+          achieved: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-500', label: 'text-emerald-700', icon: '✓' },
+          'on-track': { bg: 'bg-sky-50', border: 'border-sky-200', badge: 'bg-sky-400', label: 'text-sky-700', icon: '→' },
+          improve: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-400', label: 'text-amber-700', icon: '△' },
+          urgent: { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-400', label: 'text-red-700', icon: '!' },
+        };
+        const labels = { achieved: 'Achieved', 'on-track': 'On Track', improve: 'Needs Work', urgent: 'Urgent' };
+
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {goals.map((g, i) => {
+              const c = colors[g.status];
+              return (
+                <div key={i} className={`rounded-xl border p-4 ${c.bg} ${c.border}`}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-sm font-bold text-gray-800">{g.title}</p>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${c.badge} whitespace-nowrap`}>
+                      {c.icon} {labels[g.status]}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-3 mb-1">
+                    <span className={`text-lg font-black tabular-nums ${c.label}`}>{g.current}</span>
+                    <span className="text-xs text-gray-400">target {g.target}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-2">{g.description}</p>
+                  <div className="border-t border-black/5 pt-2">
+                    <p className="text-xs font-semibold text-gray-700">Action: <span className="font-normal text-gray-600">{g.action}</span></p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* ── Cumulative Cash Flow ──────────────────────────────────────────── */}
       <SectionHeader title="Cumulative Cash Flow" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

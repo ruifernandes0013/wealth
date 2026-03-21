@@ -159,7 +159,7 @@ function SortableColHead({ id, name, onDelete, onRename }: {
 
   if (editing) {
     return (
-      <th style={style} className="px-1 py-1 text-right text-xs font-semibold whitespace-nowrap min-w-[70px]">
+      <th style={style} className="px-1 py-1 text-right text-xs font-semibold whitespace-nowrap min-w-[50px]">
         <input
           autoFocus
           value={draft}
@@ -175,7 +175,7 @@ function SortableColHead({ id, name, onDelete, onRename }: {
   return (
     <>
       <th ref={setNodeRef} style={style} {...attributes} {...listeners}
-        className="px-1 py-1 text-xs font-semibold whitespace-nowrap group/col min-w-[60px] cursor-grab active:cursor-grabbing touch-none">
+        className="px-1 py-1 text-xs font-semibold whitespace-nowrap group/col min-w-[50px] cursor-grab active:cursor-grabbing touch-none">
         <div className="flex items-center justify-between gap-1">
           <span className="truncate flex-1 text-center">{name}</span>
           <button
@@ -329,7 +329,8 @@ export default function Monthly() {
   );
 
   const ZOOM_STEPS = [0.7, 0.8, 0.9, 1.0, 1.1, 1.25];
-  const [zoomIdx, setZoomIdx] = useState(2); // default 0.9
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [zoomIdx, setZoomIdx] = useState(isMobile ? 0 : 2); // 70% mobile, 90% desktop
   const zoom = ZOOM_STEPS[zoomIdx];
 
   const handleDragEnd = (table: 'income' | 'expenses' | 'investments', names: string[]) =>
@@ -640,7 +641,7 @@ export default function Monthly() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-emerald-600 text-white">
-                  <th className="sticky left-0 z-10 bg-emerald-600 px-2 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-emerald-500">MONTH</th>
+                  <th className="sticky left-0 z-10 bg-emerald-600 px-1 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-emerald-500">MONTH</th>
                   <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd('income', incomeNames)}>
                     <SortableContext items={incomeNames} strategy={horizontalListSortingStrategy}>
                       {incomeNames.map(name => (
@@ -651,7 +652,7 @@ export default function Monthly() {
                       ))}
                     </SortableContext>
                   </DndContext>
-                  <th className="bg-emerald-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-emerald-500">TOTAL</th>
+                  <th className="sticky right-0 z-10 bg-emerald-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-emerald-500">TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -660,9 +661,10 @@ export default function Monthly() {
                   const baseColor = isProjected ? 'text-gray-400' : 'text-emerald-700';
                   const zeroColor = isProjected ? 'text-gray-300' : 'text-gray-300';
                   const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30';
+                  const stickyBg = idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50';
                   return (
                     <tr key={m.id} className={`border-b border-emerald-50 transition-colors ${rowBg} hover:bg-emerald-50/60`}>
-                      <td className={`sticky left-0 z-10 px-2 py-1 font-semibold text-xs whitespace-nowrap border-r border-emerald-100 ${rowBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-emerald-100 ${stickyBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
                         {MONTH_NAMES_PT[m.month - 1]}
                       </td>
                       {incomeNames.map(name => {
@@ -670,7 +672,7 @@ export default function Monthly() {
                         const val = item?.amount ?? 0;
                         return EC(m, 'income', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-emerald-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-emerald-50/80 text-emerald-300' : 'bg-white text-emerald-700'}`}>
+                      <td className={`sticky right-0 z-10 px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-emerald-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-emerald-50 text-emerald-300' : 'bg-white text-emerald-700'}`}>
                         {formatCurrency(m.calc.cashIn)}
                       </td>
                     </tr>
@@ -679,9 +681,9 @@ export default function Monthly() {
               </tbody>
               <tfoot>
                 <tr className="bg-emerald-700 text-white font-bold border-t-2 border-emerald-400">
-                  <td className="sticky left-0 z-10 bg-emerald-700 px-2 py-1 text-xs uppercase tracking-wider border-r border-emerald-500">TOTAL</td>
+                  <td className="sticky left-0 z-10 bg-emerald-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-emerald-500">TOTAL</td>
                   {incomeNames.map(name => <td key={name} />)}
-                  <td className="bg-emerald-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-emerald-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
+                  <td className="sticky right-0 z-10 bg-emerald-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-emerald-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.cashIn, 0))}
                   </td>
                 </tr>
@@ -704,7 +706,7 @@ export default function Monthly() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-red-600 text-white">
-                  <th className="sticky left-0 z-10 bg-red-600 px-2 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-red-500">MONTH</th>
+                  <th className="sticky left-0 z-10 bg-red-600 px-1 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-red-500">MONTH</th>
                   <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd('expenses', expenseNames)}>
                     <SortableContext items={expenseNames} strategy={horizontalListSortingStrategy}>
                       {expenseNames.map(name => (
@@ -715,7 +717,7 @@ export default function Monthly() {
                       ))}
                     </SortableContext>
                   </DndContext>
-                  <th className="bg-red-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-red-500">TOTAL</th>
+                  <th className="sticky right-0 z-10 bg-red-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-red-500">TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -724,9 +726,10 @@ export default function Monthly() {
                   const baseColor = isProjected ? 'text-gray-400' : 'text-red-600';
                   const zeroColor = isProjected ? 'text-gray-300' : 'text-gray-300';
                   const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-red-50/30';
+                  const stickyBg = idx % 2 === 0 ? 'bg-white' : 'bg-red-50';
                   return (
                     <tr key={m.id} className={`border-b border-red-50 transition-colors ${rowBg} hover:bg-red-50/60`}>
-                      <td className={`sticky left-0 z-10 px-2 py-1 font-semibold text-xs whitespace-nowrap border-r border-red-100 ${rowBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-red-100 ${stickyBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
                         {MONTH_NAMES_PT[m.month - 1]}
                       </td>
                       {expenseNames.map(name => {
@@ -734,7 +737,7 @@ export default function Monthly() {
                         const val = item?.amount ?? 0;
                         return EC(m, 'expenses', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-red-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-red-50/80 text-red-300' : 'bg-white text-red-700'}`}>
+                      <td className={`sticky right-0 z-10 px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-red-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-red-50 text-red-300' : 'bg-white text-red-700'}`}>
                         {formatCurrency(m.calc.gastosR)}
                       </td>
                     </tr>
@@ -743,9 +746,9 @@ export default function Monthly() {
               </tbody>
               <tfoot>
                 <tr className="bg-red-700 text-white font-bold border-t-2 border-red-400">
-                  <td className="sticky left-0 z-10 bg-red-700 px-2 py-1 text-xs uppercase tracking-wider border-r border-red-500">TOTAL</td>
+                  <td className="sticky left-0 z-10 bg-red-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-red-500">TOTAL</td>
                   {expenseNames.map(name => <td key={name} />)}
-                  <td className="bg-red-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-red-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
+                  <td className="sticky right-0 z-10 bg-red-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-red-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.gastosR, 0))}
                   </td>
                 </tr>
@@ -768,7 +771,7 @@ export default function Monthly() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-violet-600 text-white">
-                  <th className="sticky left-0 z-10 bg-violet-600 px-2 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-violet-500">MONTH</th>
+                  <th className="sticky left-0 z-10 bg-violet-600 px-1 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-violet-500">MONTH</th>
                   <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd('investments', investmentNames)}>
                     <SortableContext items={investmentNames} strategy={horizontalListSortingStrategy}>
                       {investmentNames.map(name => (
@@ -779,7 +782,7 @@ export default function Monthly() {
                       ))}
                     </SortableContext>
                   </DndContext>
-                  <th className="bg-violet-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-violet-500">TOTAL</th>
+                  <th className="sticky right-0 z-10 bg-violet-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-violet-500">TOTAL</th>
                 </tr>
               </thead>
               <tbody>
@@ -788,9 +791,10 @@ export default function Monthly() {
                   const baseColor = isProjected ? 'text-gray-400' : 'text-violet-600';
                   const zeroColor = isProjected ? 'text-gray-300' : 'text-gray-300';
                   const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-violet-50/30';
+                  const stickyBg = idx % 2 === 0 ? 'bg-white' : 'bg-violet-50';
                   return (
                     <tr key={m.id} className={`border-b border-violet-50 transition-colors ${rowBg} hover:bg-violet-50/60`}>
-                      <td className={`sticky left-0 z-10 px-2 py-1 font-semibold text-xs whitespace-nowrap border-r border-violet-100 ${rowBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-violet-100 ${stickyBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
                         {MONTH_NAMES_PT[m.month - 1]}
                       </td>
                       {investmentNames.map(name => {
@@ -798,7 +802,7 @@ export default function Monthly() {
                         const val = item?.amount ?? 0;
                         return EC(m, 'investments', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-violet-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-violet-50/80 text-violet-300' : 'bg-white text-violet-700'}`}>
+                      <td className={`sticky right-0 z-10 px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-violet-100 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.1)] ${isProjected ? 'bg-violet-50 text-violet-300' : 'bg-white text-violet-700'}`}>
                         {formatCurrency(m.calc.savingsTotal)}
                       </td>
                     </tr>
@@ -807,9 +811,9 @@ export default function Monthly() {
               </tbody>
               <tfoot>
                 <tr className="bg-violet-700 text-white font-bold border-t-2 border-violet-400">
-                  <td className="sticky left-0 z-10 bg-violet-700 px-2 py-1 text-xs uppercase tracking-wider border-r border-violet-500">TOTAL</td>
+                  <td className="sticky left-0 z-10 bg-violet-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-violet-500">TOTAL</td>
                   {investmentNames.map(name => <td key={name} />)}
-                  <td className="bg-violet-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-violet-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
+                  <td className="sticky right-0 z-10 bg-violet-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-violet-500 shadow-[-2px_0_8px_-4px_rgba(0,0,0,0.3)]">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.savingsTotal, 0))}
                   </td>
                 </tr>
