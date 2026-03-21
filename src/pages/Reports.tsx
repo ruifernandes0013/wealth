@@ -35,15 +35,33 @@ import type { ExpenseData, IncomeData, SavingsAllocation } from '../types';
 
 // ─── Color Palettes ───────────────────────────────────────────────────────────
 
-const INCOME_COLORS = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'];
+const INCOME_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'];
+
 const EXPENSE_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
-  '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899',
-  '#14b8a6', '#f43f5e', '#a855f7',
+  '#ef4444',  // prestacao - red
+  '#f97316',  // condObras - orange
+  '#eab308',  // agua - yellow
+  '#84cc16',  // luz - lime
+  '#10b981',  // internet - emerald
+  '#06b6d4',  // gasoleo - cyan
+  '#3b82f6',  // alimentacao - blue
+  '#8b5cf6',  // mecanico - violet
+  '#ec4899',  // netflix - pink
+  '#14b8a6',  // telefone - teal
+  '#f43f5e',  // gymNutri - rose
+  '#a855f7',  // saidas - purple
+  '#6366f1',  // outros - indigo
 ];
+
 const SAVINGS_COLORS = [
-  '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#6d28d9',
-  '#7c3aed', '#4c1d95', '#5b21b6',
+  '#8b5cf6',  // contas - violet
+  '#06b6d4',  // ferias - cyan
+  '#10b981',  // t1Felgueiras - emerald
+  '#f59e0b',  // t1Esposende - amber
+  '#ef4444',  // t1Fradelos - red
+  '#ec4899',  // casamento - pink
+  '#3b82f6',  // stockMarket - blue
+  '#f97316',  // ouro - orange
 ];
 
 // ─── Custom Tooltip ──────────────────────────────────────────────────────────
@@ -130,16 +148,16 @@ function DonutChart({ data, colors, title }: DonutProps) {
               <div key={d.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5">
                   <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    className="w-3 h-3 rounded-sm flex-shrink-0"
                     style={{ backgroundColor: colors[i % colors.length] }}
                   />
                   <span className="text-gray-600">{d.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">
+                  <span className="text-gray-400 font-medium">
                     {total > 0 ? formatPct((d.value / total) * 100) : '—'}
                   </span>
-                  <span className="font-semibold text-gray-800">
+                  <span className="font-bold text-gray-800">
                     {formatCurrency(d.value)}
                   </span>
                 </div>
@@ -163,16 +181,40 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+const MONTH_NAMES_FULL = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const { getMonthsForYear, getYearConfig, getAvailableYears } = useData();
+  const { getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
   const availableYears = getAvailableYears();
-  const [selectedYear, setSelectedYear] = useState(availableYears[0] ?? 2026);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [fromMonth, setFromMonth] = useState(1);
+  const [toMonth, setToMonth] = useState(12);
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
-  const computed = calcYearMonths(months, yearConfig.initialBalance);
+  const allComputed = calcYearMonths(months, yearConfig.initialBalance);
+
+  // Filter by month range
+  const computed = allComputed.filter(m => m.month >= fromMonth && m.month <= toMonth);
+
+  const handleCurrentMonth = () => {
+    const now = new Date();
+    setFromMonth(now.getMonth() + 1);
+    setToMonth(now.getMonth() + 1);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   // ── YTD aggregates ──────────────────────────────────────────────────────────
   const totalIncome = computed.reduce((s, m) => s + m.calc.cashIn, 0);
@@ -198,7 +240,7 @@ export default function Reports() {
 
   const monthsAbove60 = computed.filter((m) => m.calc.savingsPct >= 60).length;
 
-  // Biggest expense category (across all months)
+  // Biggest expense category (across filtered months)
   const expenseSumByKey: Record<string, number> = {};
   computed.forEach((m) => {
     (Object.keys(EXPENSE_LABELS) as (keyof ExpenseData)[]).forEach((k) => {
@@ -215,7 +257,7 @@ export default function Reports() {
     name: MONTH_NAMES_PT[m.month - 1],
     Receitas: m.calc.cashIn,
     Despesas: m.calc.gastosEx,
-    Poupanças: m.calc.savingsTotal,
+    Investimentos: m.calc.savingsTotal,
   }));
 
   const savingsRateData = computed.map((m) => ({
@@ -249,8 +291,8 @@ export default function Reports() {
     })
   );
 
-  // Savings allocations donut
-  const savingsAllocations = (
+  // Investments allocations donut
+  const investmentAllocations = (
     Object.keys(SAVINGS_LABELS) as (keyof SavingsAllocation)[]
   ).map((k) => ({
     name: SAVINGS_LABELS[k],
@@ -283,11 +325,13 @@ export default function Reports() {
     'Gym/Nutri': m.expenses.gymNutri,
     Saídas: m.expenses.saidas,
     Outros: m.expenses.outros,
-    Extras: m.extraExpenses,
   }));
 
   // Confirmed months table
   const confirmedMonths = computed.filter((m) => m.confirmed);
+
+  // Check if any month has custom investments
+  const hasCustomInvestments = computed.some(m => (m.customInvestments || []).length > 0);
 
   return (
     <div className="space-y-8">
@@ -299,38 +343,90 @@ export default function Reports() {
             Análise detalhada das finanças
           </p>
         </div>
-        <div className="relative">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Year selector */}
+          <div className="relative">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
+            >
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          {/* From month */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-gray-500">De:</span>
+            <select
+              value={fromMonth}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setFromMonth(v);
+                if (v > toMonth) setToMonth(v);
+              }}
+              className="appearance-none bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
+            >
+              {MONTH_NAMES_FULL.map((name, i) => (
+                <option key={i + 1} value={i + 1}>{name}</option>
+              ))}
+            </select>
+          </div>
+          {/* To month */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-gray-500">Até:</span>
+            <select
+              value={toMonth}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setToMonth(v);
+                if (v < fromMonth) setFromMonth(v);
+              }}
+              className="appearance-none bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
+            >
+              {MONTH_NAMES_FULL.map((name, i) => (
+                <option key={i + 1} value={i + 1}>{name}</option>
+              ))}
+            </select>
+          </div>
+          {/* Current month shortcut */}
+          <button
+            onClick={handleCurrentMonth}
+            className="px-3 py-2 text-sm font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg transition-colors"
           >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            Mês actual
+          </button>
+          {/* Reset to full year */}
+          <button
+            onClick={() => { setFromMonth(1); setToMonth(12); }}
+            className="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+          >
+            Ano completo
+          </button>
         </div>
       </div>
 
       {/* ── Summary Stat Cards ────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
-          title="Receitas YTD"
+          title="Receitas"
           value={formatCurrency(totalIncome)}
           icon={<TrendingUp className="w-5 h-5 text-emerald-600" />}
           colorClass="text-emerald-600"
         />
         <StatCard
-          title="Despesas YTD"
+          title="Despesas"
           value={formatCurrency(totalExpenses)}
           icon={<TrendingDown className="w-5 h-5 text-red-500" />}
           colorClass="text-red-600"
         />
         <StatCard
-          title="Guardado YTD"
+          title="Guardado"
           value={formatCurrency(totalSaved)}
           icon={<PiggyBank className="w-5 h-5 text-violet-600" />}
           colorClass="text-violet-600"
@@ -374,7 +470,7 @@ export default function Reports() {
           subtitle="Média simples todos os meses"
         />
         <StatCard
-          title="Poupança Mensal Média"
+          title="Investimento Mensal Médio"
           value={formatCurrency(avgMonthlySavings)}
           colorClass="text-violet-600"
           subtitle="Guardado médio por mês"
@@ -412,7 +508,7 @@ export default function Reports() {
           subtitle={`Início de ${selectedYear}`}
         />
         <StatCard
-          title="Variação de Saldo Anual"
+          title="Variação de Saldo"
           value={formatCurrency(lastBalance - yearConfig.initialBalance)}
           colorClass={
             lastBalance - yearConfig.initialBalance >= 0
@@ -435,7 +531,7 @@ export default function Reports() {
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Poupanças" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Investimentos" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -519,7 +615,7 @@ export default function Reports() {
       </div>
 
       {/* ── Donut Charts ────────────────────────────────────────────────────── */}
-      <SectionHeader title="Distribuição YTD" />
+      <SectionHeader title="Distribuição" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <DonutChart
           title="Fontes de Rendimento"
@@ -532,8 +628,8 @@ export default function Reports() {
           colors={EXPENSE_COLORS}
         />
         <DonutChart
-          title="Alocação de Poupanças"
-          data={savingsAllocations}
+          title="Alocação de Investimentos"
+          data={investmentAllocations}
           colors={SAVINGS_COLORS}
         />
       </div>
@@ -549,10 +645,10 @@ export default function Reports() {
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Bar dataKey="Esposende" stackId="a" fill="#10b981" />
-            <Bar dataKey="Felgueiras" stackId="a" fill="#34d399" />
-            <Bar dataKey="Fradelos" stackId="a" fill="#6ee7b7" />
-            <Bar dataKey="DocBay" stackId="a" fill="#3b82f6" />
-            <Bar dataKey="Receita" stackId="a" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Felgueiras" stackId="a" fill="#3b82f6" />
+            <Bar dataKey="Fradelos" stackId="a" fill="#f59e0b" />
+            <Bar dataKey="DocBay" stackId="a" fill="#8b5cf6" />
+            <Bar dataKey="Receita" stackId="a" fill="#06b6d4" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -570,18 +666,17 @@ export default function Reports() {
             {[
               { key: 'Prestação', color: '#ef4444' },
               { key: 'Cond/Obras', color: '#f97316' },
-              { key: 'Água', color: '#06b6d4' },
-              { key: 'Luz', color: '#eab308' },
-              { key: 'Internet', color: '#3b82f6' },
-              { key: 'Gasóleo', color: '#78716c' },
-              { key: 'Alimentação', color: '#22c55e' },
-              { key: 'Mecânico', color: '#64748b' },
-              { key: 'Netflix', color: '#dc2626' },
-              { key: 'Telefone', color: '#7c3aed' },
-              { key: 'Gym/Nutri', color: '#16a34a' },
-              { key: 'Saídas', color: '#ec4899' },
-              { key: 'Outros', color: '#9ca3af' },
-              { key: 'Extras', color: '#f59e0b' },
+              { key: 'Água', color: '#eab308' },
+              { key: 'Luz', color: '#84cc16' },
+              { key: 'Internet', color: '#10b981' },
+              { key: 'Gasóleo', color: '#06b6d4' },
+              { key: 'Alimentação', color: '#3b82f6' },
+              { key: 'Mecânico', color: '#8b5cf6' },
+              { key: 'Netflix', color: '#ec4899' },
+              { key: 'Telefone', color: '#14b8a6' },
+              { key: 'Gym/Nutri', color: '#f43f5e' },
+              { key: 'Saídas', color: '#a855f7' },
+              { key: 'Outros', color: '#6366f1' },
             ].map(({ key, color }, i, arr) => (
               <Bar
                 key={key}
@@ -594,6 +689,41 @@ export default function Reports() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* ── Custom Investments Breakdown ─────────────────────────────────── */}
+      {hasCustomInvestments && (
+        <>
+          <SectionHeader title="Investimentos Adicionais por Mês" />
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Mês</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Descrição</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {computed.flatMap(m =>
+                    (m.customInvestments || []).map(item => (
+                      <tr key={`${m.id}-${item.id}`} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap font-medium">
+                          {MONTH_NAMES_PT[m.month - 1]} {m.year}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{item.name || '—'}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-violet-600 whitespace-nowrap">
+                          {formatCurrency(item.amount)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Confirmed Months Summary Table ──────────────────────────────── */}
       {confirmedMonths.length > 0 && (
@@ -609,7 +739,7 @@ export default function Reports() {
                       'Receita',
                       'G.R.',
                       'G.EX.',
-                      'Poupanças',
+                      'Investimentos',
                       'Cash Out',
                       'Guardado',
                       '(%)',

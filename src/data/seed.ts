@@ -63,7 +63,9 @@ export const seedMonths2026: MonthEntry[] = [
       saidas: 189.90,
       outros: 223.92,
     },
-    extraExpenses: 0,
+    gastosExOverride: null,
+    customExpenses: [],
+    customInvestments: [],
     savings: {
       contas: 11.33,
       ferias: 179.85,
@@ -102,7 +104,9 @@ export const seedMonths2026: MonthEntry[] = [
       saidas: 161.58,
       outros: 654.67,
     },
-    extraExpenses: 0,
+    gastosExOverride: null,
+    customExpenses: [],
+    customInvestments: [],
     savings: {
       contas: 11.33,
       ferias: 155.12,
@@ -141,7 +145,9 @@ export const seedMonths2026: MonthEntry[] = [
       saidas: 282.77,
       outros: 203.94,
     },
-    extraExpenses: 32.07,
+    gastosExOverride: 3100.00,
+    customExpenses: [],
+    customInvestments: [],
     savings: {
       contas: 11.33,
       ferias: 1449.26,
@@ -161,7 +167,9 @@ export const seedMonths2026: MonthEntry[] = [
     confirmed: false,
     income: { ...zeroIncome },
     expenses: { ...zeroExpenses },
-    extraExpenses: 431.13,
+    gastosExOverride: 2400.00,
+    customExpenses: [] as MonthEntry['customExpenses'],
+    customInvestments: [] as MonthEntry['customInvestments'],
     savings: { ...zeroSavings },
   })),
 ];

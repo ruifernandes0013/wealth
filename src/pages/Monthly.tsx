@@ -14,6 +14,7 @@ export default function Monthly() {
     getAvailableYears,
     updateMonth,
     updateYearConfig,
+    loading,
   } = useData();
 
   const availableYears = getAvailableYears();
@@ -38,6 +39,10 @@ export default function Monthly() {
     setEditingBalance(false);
   };
 
+  const handleSave = async (updated: MonthEntry) => {
+    await updateMonth(updated);
+  };
+
   const cols = [
     { key: 'mes', label: 'MÊS', sticky: true },
     { key: 'esposende', label: 'ESPOSENDE' },
@@ -49,13 +54,21 @@ export default function Monthly() {
     { key: 'cashOut', label: 'CASH OUT' },
     { key: 'gastosEx', label: 'G.EX.' },
     { key: 'gastosR', label: 'G.R.' },
-    { key: 'extras', label: 'EXTRAS' },
+    { key: 'extras', label: 'SALDO' },
     { key: 'guardado', label: 'GUARDADO' },
     { key: 'pct', label: '(%)' },
     { key: 'ano', label: 'ANO' },
     { key: 'total', label: 'TOTAL' },
     { key: 'confirmed', label: '✅' },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -149,10 +162,14 @@ export default function Monthly() {
                 {cols.map((col) => (
                   <th
                     key={col.key}
-                    className={`px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap ${
-                      col.sticky
-                        ? 'sticky left-0 z-10 bg-gray-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]'
-                        : ''
+                    className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
+                      col.key === 'cashIn'
+                        ? 'bg-emerald-500 text-white'
+                        : col.key === 'cashOut'
+                        ? 'bg-red-500 text-white'
+                        : col.sticky
+                        ? 'text-gray-500 sticky left-0 z-10 bg-gray-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]'
+                        : 'text-gray-500'
                     }`}
                   >
                     {col.label}
@@ -223,7 +240,7 @@ export default function Monthly() {
                       {formatCurrency(m.calc.gastosR)}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-orange-500 whitespace-nowrap">
-                      {formatCurrency(m.extraExpenses)}
+                      {formatCurrency(m.calc.saldo)}
                     </td>
                     <td
                       className={`px-3 py-3 text-right tabular-nums font-bold whitespace-nowrap ${
@@ -319,7 +336,7 @@ export default function Monthly() {
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums text-orange-600 whitespace-nowrap">
                     {formatCurrency(
-                      computed.reduce((s, m) => s + m.extraExpenses, 0)
+                      computed.reduce((s, m) => s + m.calc.saldo, 0)
                     )}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums text-violet-700 whitespace-nowrap">
@@ -356,7 +373,10 @@ export default function Monthly() {
       {editingMonth && (
         <EditMonthModal
           month={editingMonth}
-          onSave={updateMonth}
+          onSave={(updated) => {
+            handleSave(updated);
+            setEditingMonth(null);
+          }}
           onClose={() => setEditingMonth(null)}
         />
       )}

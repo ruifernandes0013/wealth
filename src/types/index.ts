@@ -33,6 +33,12 @@ export interface SavingsAllocation {
   ouro: number;
 }
 
+export interface CustomItem {
+  id: string;
+  name: string;
+  amount: number;
+}
+
 export interface MonthEntry {
   id: string;
   year: number;
@@ -40,7 +46,9 @@ export interface MonthEntry {
   confirmed: boolean;
   income: IncomeData;
   expenses: ExpenseData;
-  extraExpenses: number;
+  gastosExOverride: number | null; // if set, gastosEx = this value; saldo = gastosEx - gastosR
+  customExpenses: CustomItem[];     // dynamic user-added expense lines
+  customInvestments: CustomItem[];  // dynamic user-added investment lines
   savings: SavingsAllocation;
 }
 
@@ -56,11 +64,12 @@ export interface AppState {
 
 export interface MonthCalculations {
   cashIn: number;
-  gastosR: number;
-  gastosEx: number;
-  savingsTotal: number;
-  cashOut: number;
-  guardado: number;
+  gastosR: number;      // sum of fixed expense categories + customExpenses
+  gastosEx: number;     // gastosExOverride ?? gastosR
+  saldo: number;        // gastosEx - gastosR
+  savingsTotal: number; // fixed savings + customInvestments
+  cashOut: number;      // gastosEx + savingsTotal
+  guardado: number;     // cashIn - gastosEx
   savingsPct: number;
   netBankChange: number;
 }

@@ -13,24 +13,19 @@ export function sumObject(obj: Record<string, number>): number {
 
 export function calcMonth(entry: MonthEntry): MonthCalculations {
   const cashIn = sumObject(entry.income as unknown as Record<string, number>);
-  const gastosR = sumObject(entry.expenses as unknown as Record<string, number>);
-  const gastosEx = gastosR + (entry.extraExpenses || 0);
-  const savingsTotal = sumObject(entry.savings as unknown as Record<string, number>);
+  const fixedExpenses = sumObject(entry.expenses as unknown as Record<string, number>);
+  const customExpSum = (entry.customExpenses || []).reduce((s, i) => s + i.amount, 0);
+  const gastosR = fixedExpenses + customExpSum;
+  const gastosEx = entry.gastosExOverride != null ? entry.gastosExOverride : gastosR;
+  const saldo = gastosEx - gastosR;
+  const fixedSavings = sumObject(entry.savings as unknown as Record<string, number>);
+  const customInvSum = (entry.customInvestments || []).reduce((s, i) => s + i.amount, 0);
+  const savingsTotal = fixedSavings + customInvSum;
   const cashOut = gastosEx + savingsTotal;
   const guardado = cashIn - gastosEx;
   const savingsPct = cashIn > 0 ? (guardado / cashIn) * 100 : 0;
   const netBankChange = cashIn - cashOut;
-
-  return {
-    cashIn,
-    gastosR,
-    gastosEx,
-    savingsTotal,
-    cashOut,
-    guardado,
-    savingsPct,
-    netBankChange,
-  };
+  return { cashIn, gastosR, gastosEx, saldo, savingsTotal, cashOut, guardado, savingsPct, netBankChange };
 }
 
 export function calcYearMonths(
