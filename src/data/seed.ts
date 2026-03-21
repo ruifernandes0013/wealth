@@ -78,6 +78,7 @@ export const seedMonths2026: MonthEntry[] = [
       ouro: 240,
     },
     hiddenFields: [],
+    notes: {},
   },
   {
     id: '2026-02',
@@ -121,6 +122,7 @@ export const seedMonths2026: MonthEntry[] = [
       ouro: 0,
     },
     hiddenFields: [],
+    notes: {},
   },
   {
     id: '2026-03',
@@ -164,6 +166,7 @@ export const seedMonths2026: MonthEntry[] = [
       ouro: 0,
     },
     hiddenFields: [],
+    notes: {},
   },
   // APR - DEZ: months 4-12 identical projections
   ...[4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => ({
@@ -179,6 +182,7 @@ export const seedMonths2026: MonthEntry[] = [
     customInvestments: [] as MonthEntry['customInvestments'],
     savings: { ...zeroSavings },
     hiddenFields: [] as string[],
+    notes: {} as Record<string, string>,
   })),
 ];
 

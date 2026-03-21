@@ -60,6 +60,7 @@ function rowToMonth(row: Record<string, unknown>): MonthEntry {
     customExpenses: (row.custom_expenses as MonthEntry['customExpenses']) || [],
     customInvestments: (row.custom_investments as MonthEntry['customInvestments']) || [],
     hiddenFields: (row.hidden_fields as string[]) || [],
+    notes: (row.notes as Record<string, string>) || {},
   };
 }
 
@@ -79,6 +80,7 @@ function monthToRow(month: MonthEntry, userId: string) {
     custom_expenses: month.customExpenses,
     custom_investments: month.customInvestments,
     hidden_fields: month.hiddenFields || [],
+    notes: month.notes || {},
   };
 }
 

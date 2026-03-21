@@ -52,6 +52,7 @@ export interface MonthEntry {
   customInvestments: CustomItem[];  // dynamic user-added investment lines
   savings: SavingsAllocation;
   hiddenFields: string[];           // tracks which fixed field keys are hidden/zeroed per month
+  notes: Record<string, string>;
 }
 
 export interface YearConfig {
@@ -87,7 +88,7 @@ export const INCOME_LABELS: Record<keyof IncomeData, string> = {
   felgueiras: 'Felgueiras',
   fradelos: 'Fradelos',
   docbay: 'DocBay',
-  receita: 'Other Income',
+  receita: 'Salary',
 };
 
 export const EXPENSE_LABELS: Record<keyof ExpenseData, string> = {
