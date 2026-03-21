@@ -24,13 +24,13 @@ import StatCard from '../components/StatCard';
 import { MONTH_NAMES_PT } from '../types';
 
 export default function Dashboard() {
-  const { getMonthsForYear, getYearConfig, getAvailableYears } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears } = useData();
   const availableYears = getAvailableYears();
   const [selectedYear, setSelectedYear] = useState(availableYears[0] ?? 2026);
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
-  const computed = calcYearMonths(months, yearConfig.initialBalance);
+  const computed = calcYearMonths(months, state.income, state.expenses, state.investments, yearConfig.initialBalance);
 
   // YTD sums
   const totalIncome = computed.reduce((s, m) => s + m.calc.cashIn, 0);

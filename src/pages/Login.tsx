@@ -19,7 +19,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-8">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-sm p-8">
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 bg-violet-600 rounded-xl flex items-center justify-center mb-3">
@@ -36,7 +36,7 @@ export default function Login() {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-400"
               placeholder="you@example.com"
             />
           </div>
@@ -47,7 +47,7 @@ export default function Login() {
               required
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-violet-400"
               placeholder="••••••••"
             />
           </div>

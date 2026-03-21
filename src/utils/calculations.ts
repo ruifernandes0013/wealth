@@ -1,32 +1,16 @@
-import type {
-  MonthEntry,
-  MonthCalculations,
-  MonthWithCalc,
-} from '../types';
+import type { MonthMeta, MonthWithCalc, MonthCalculations, LineItem } from '../types';
 
-export function sumObject(obj: Record<string, number>): number {
-  return Object.values(obj).reduce((acc, v) => acc + (v || 0), 0);
-}
-
-export function calcMonth(entry: MonthEntry): MonthCalculations {
-  const hidden = new Set(entry.hiddenFields || []);
-
-  const customIncomeSum = (entry.customIncome || []).reduce((s, i) => s + i.amount, 0);
-  const cashIn = Object.entries(entry.income).reduce(
-    (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
-  ) + customIncomeSum;
-  const fixedExpenses = Object.entries(entry.expenses).reduce(
-    (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
-  );
-  const customExpSum = (entry.customExpenses || []).reduce((s, i) => s + i.amount, 0);
-  const gastosR = fixedExpenses + customExpSum;
-  const gastosEx = entry.gastosExOverride != null ? entry.gastosExOverride : gastosR;
+export function calcMonthFromItems(
+  meta: MonthMeta,
+  incomeItems: LineItem[],
+  expenseItems: LineItem[],
+  investmentItems: LineItem[]
+): MonthCalculations {
+  const cashIn = incomeItems.reduce((s, i) => s + i.amount, 0);
+  const gastosR = expenseItems.reduce((s, e) => s + e.amount, 0);
+  const gastosEx = meta.gastosExOverride != null ? meta.gastosExOverride : gastosR;
   const saldo = gastosEx - gastosR;
-  const fixedSavings = Object.entries(entry.savings).reduce(
-    (s, [k, v]) => s + (hidden.has(k) ? 0 : (v as number || 0)), 0
-  );
-  const customInvSum = (entry.customInvestments || []).reduce((s, i) => s + i.amount, 0);
-  const savingsTotal = fixedSavings + customInvSum;
+  const savingsTotal = investmentItems.reduce((s, i) => s + i.amount, 0);
   const cashOut = gastosEx + savingsTotal;
   const guardado = cashIn - gastosEx;
   const savingsPct = cashIn > 0 ? (guardado / cashIn) * 100 : 0;
@@ -35,24 +19,22 @@ export function calcMonth(entry: MonthEntry): MonthCalculations {
 }
 
 export function calcYearMonths(
-  months: MonthEntry[],
+  months: MonthMeta[],
+  income: LineItem[],
+  expenses: LineItem[],
+  investments: LineItem[],
   initialBalance: number
 ): MonthWithCalc[] {
   const sorted = [...months].sort((a, b) => a.month - b.month);
-
   let runningAno = 0;
   let runningBalance = initialBalance;
-
-  return sorted.map((entry) => {
-    const calc = calcMonth(entry);
+  return sorted.map(meta => {
+    const incomeItems = income.filter(i => i.year === meta.year && i.month === meta.month);
+    const expenseItems = expenses.filter(e => e.year === meta.year && e.month === meta.month);
+    const investmentItems = investments.filter(i => i.year === meta.year && i.month === meta.month);
+    const calc = calcMonthFromItems(meta, incomeItems, expenseItems, investmentItems);
     runningAno += calc.guardado;
     runningBalance += calc.netBankChange;
-
-    return {
-      ...entry,
-      calc,
-      ano: runningAno,
-      totalBalance: runningBalance,
-    };
+    return { ...meta, calc, incomeItems, expenseItems, investmentItems, ano: runningAno, totalBalance: runningBalance };
   });
 }

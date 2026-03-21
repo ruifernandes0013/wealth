@@ -34,8 +34,7 @@ import { useData } from '../context/DataContext';
 import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
 import StatCard from '../components/StatCard';
-import { MONTH_NAMES_PT, MONTH_NAMES_FULL_PT, EXPENSE_LABELS, INCOME_LABELS, SAVINGS_LABELS } from '../types';
-import type { ExpenseData, IncomeData, SavingsAllocation } from '../types';
+import { MONTH_NAMES_PT, MONTH_NAMES_FULL_PT } from '../types';
 
 // ─── Color Palettes ───────────────────────────────────────────────────────────
 
@@ -240,7 +239,7 @@ const MONTH_NAMES_FULL = MONTH_NAMES_FULL_PT;
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const { getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
   const availableYears = getAvailableYears();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [fromMonth, setFromMonth] = useState(1);
@@ -248,7 +247,20 @@ export default function Reports() {
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
-  const allComputed = calcYearMonths(months, yearConfig.initialBalance);
+  const allComputed = calcYearMonths(months, state.income, state.expenses, state.investments, yearConfig.initialBalance);
+
+  // Dynamic column names sorted by sortOrder
+  function getUniqueNames(items: { year: number; name: string; sortOrder?: number }[], year: number): string[] {
+    const map = new Map<string, number>();
+    items.filter(i => i.year === year).forEach(i => {
+      const cur = map.get(i.name) ?? Infinity;
+      if ((i.sortOrder ?? 99) < cur) map.set(i.name, i.sortOrder ?? 99);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[1] - b[1]).map(([n]) => n);
+  }
+  const incomeNames = getUniqueNames(state.income, selectedYear);
+  const expenseNames = getUniqueNames(state.expenses, selectedYear);
+  const investmentNames = getUniqueNames(state.investments, selectedYear);
 
   // Filter by month range
   const computed = allComputed.filter(m => m.month >= fromMonth && m.month <= toMonth);
@@ -287,6 +299,12 @@ export default function Reports() {
       ? computed[computed.length - 1].totalBalance
       : yearConfig.initialBalance;
 
+  const totalInvestments = computed.reduce((s, m) => s + m.calc.savingsTotal, 0);
+  const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+  const investmentRate = totalIncome > 0 ? (totalInvestments / totalIncome) * 100 : 0;
+  const runway = avgMonthlyExpenses > 0 ? lastBalance / avgMonthlyExpenses : 0;
+  const coverageRatio = avgMonthlyExpenses > 0 ? avgMonthlyIncome / avgMonthlyExpenses : 0;
+
   const bestMonth = computed.reduce(
     (best, m) => (m.calc.savingsPct > best.calc.savingsPct ? m : best),
     computed[0] ?? { calc: { savingsPct: 0 }, month: 0 }
@@ -295,15 +313,15 @@ export default function Reports() {
   const monthsAbove60 = computed.filter((m) => m.calc.savingsPct >= 60).length;
 
   // Biggest expense category (across filtered months)
-  const expenseSumByKey: Record<string, number> = {};
+  const expenseSumByName: Record<string, number> = {};
   computed.forEach((m) => {
-    (Object.keys(EXPENSE_LABELS) as (keyof ExpenseData)[]).forEach((k) => {
-      expenseSumByKey[k] = (expenseSumByKey[k] ?? 0) + m.expenses[k];
+    m.expenseItems.forEach(item => {
+      expenseSumByName[item.name] = (expenseSumByName[item.name] ?? 0) + item.amount;
     });
   });
-  const biggestExpenseKey = Object.keys(expenseSumByKey).sort(
-    (a, b) => expenseSumByKey[b] - expenseSumByKey[a]
-  )[0] as keyof ExpenseData | undefined;
+  const biggestExpenseName = Object.keys(expenseSumByName).sort(
+    (a, b) => expenseSumByName[b] - expenseSumByName[a]
+  )[0];
 
   // ── Chart Data ──────────────────────────────────────────────────────────────
 
@@ -331,91 +349,91 @@ export default function Reports() {
   }));
 
   // Income sources donut
-  const incomeSources = (Object.keys(INCOME_LABELS) as (keyof IncomeData)[]).map(
-    (k) => ({
-      name: INCOME_LABELS[k],
-      value: computed.reduce((s, m) => s + m.income[k], 0),
-    })
-  );
+  const incomeSources = incomeNames.map(name => ({
+    name,
+    value: computed.reduce((s, m) => s + (m.incomeItems.find(i => i.name === name)?.amount ?? 0), 0),
+  }));
 
   // Expense categories donut
-  const expenseCategories = (Object.keys(EXPENSE_LABELS) as (keyof ExpenseData)[]).map(
-    (k) => ({
-      name: EXPENSE_LABELS[k],
-      value: computed.reduce((s, m) => s + m.expenses[k], 0),
-    })
-  );
+  const expenseCategories = expenseNames.map(name => ({
+    name,
+    value: computed.reduce((s, m) => s + (m.expenseItems.find(i => i.name === name)?.amount ?? 0), 0),
+  }));
 
   // Investments allocations donut
-  const investmentAllocations = (
-    Object.keys(SAVINGS_LABELS) as (keyof SavingsAllocation)[]
-  ).map((k) => ({
-    name: SAVINGS_LABELS[k],
-    value: computed.reduce((s, m) => s + m.savings[k], 0),
+  const investmentAllocations = investmentNames.map(name => ({
+    name,
+    value: computed.reduce((s, m) => s + (m.investmentItems.find(i => i.name === name)?.amount ?? 0), 0),
   }));
 
-  // Property income stacked bar
-  const propertyData = computed.map((m) => ({
-    name: MONTH_NAMES_PT[m.month - 1],
-    Esposende: m.income.esposende,
-    Felgueiras: m.income.felgueiras,
-    Fradelos: m.income.fradelos,
-    DocBay: m.income.docbay,
-    'Other Income': m.income.receita,
-  }));
-
-  // Expense breakdown stacked bar
-  const expenseBreakdownData = computed.map((m) => ({
-    name: MONTH_NAMES_PT[m.month - 1],
-    Mortgage: m.expenses.prestacao,
-    'Condo / Works': m.expenses.condObras,
-    Water: m.expenses.agua,
-    Electricity: m.expenses.luz,
-    Internet: m.expenses.internet,
-    Diesel: m.expenses.gasoleo,
-    Food: m.expenses.alimentacao,
-    Mechanic: m.expenses.mecanico,
-    Netflix: m.expenses.netflix,
-    Phone: m.expenses.telefone,
-    'Gym / Nutrition': m.expenses.gymNutri,
-    'Going Out': m.expenses.saidas,
-    Other: m.expenses.outros,
-  }));
-
-  // Investment allocation over time
-  const investmentTimeData = filteredMonths.map(m => {
+  // Income stacked bar (dynamic)
+  const propertyData = computed.map(m => {
     const entry: Record<string, string | number> = { name: MONTH_NAMES_PT[m.month - 1] };
-    (Object.keys(SAVINGS_LABELS) as (keyof SavingsAllocation)[]).forEach(k => {
-      entry[SAVINGS_LABELS[k]] = m.savings[k] || 0;
+    incomeNames.forEach(name => {
+      entry[name] = m.incomeItems.find(i => i.name === name)?.amount ?? 0;
     });
     return entry;
   });
 
-  // Top expenses data for horizontal bar
-  const topExpensesData = (Object.keys(EXPENSE_LABELS) as (keyof ExpenseData)[]).map((k, i) => ({
-    name: EXPENSE_LABELS[k],
-    value: filteredMonths.reduce((s, m) => s + (m.expenses[k] || 0), 0),
+  // Expense breakdown stacked bar (dynamic)
+  const expenseBreakdownData = computed.map(m => {
+    const entry: Record<string, string | number> = { name: MONTH_NAMES_PT[m.month - 1] };
+    expenseNames.forEach(name => {
+      entry[name] = m.expenseItems.find(i => i.name === name)?.amount ?? 0;
+    });
+    return entry;
+  });
+
+  // Investment allocation over time (dynamic)
+  const investmentTimeData = filteredMonths.map(m => {
+    const entry: Record<string, string | number> = { name: MONTH_NAMES_PT[m.month - 1] };
+    investmentNames.forEach(name => {
+      entry[name] = m.investmentItems.find(i => i.name === name)?.amount ?? 0;
+    });
+    return entry;
+  });
+
+  // Cumulative cash flow data
+  let cumIncome = 0, cumExpenses = 0, cumNet = 0;
+  const cumulativeData = computed.map(m => {
+    cumIncome += m.calc.cashIn;
+    cumExpenses += m.calc.gastosEx;
+    cumNet += m.calc.guardado;
+    return { name: MONTH_NAMES_PT[m.month - 1], 'Income': cumIncome, 'Expenses': cumExpenses, 'Net': cumNet };
+  });
+
+  // Month-over-month delta for savings rate
+  const momDeltas = computed.map((m, i) => ({
+    name: MONTH_NAMES_PT[m.month - 1],
+    rate: m.calc.savingsPct,
+    delta: i > 0 ? m.calc.savingsPct - computed[i - 1].calc.savingsPct : 0,
+    guardado: m.calc.guardado,
+    cashIn: m.calc.cashIn,
+    confirmed: m.confirmed,
+  }));
+
+  // Top expenses data for horizontal bar (dynamic)
+  const topExpensesData = expenseNames.map((name, i) => ({
+    name,
+    value: filteredMonths.reduce((s, m) => s + (m.expenseItems.find(item => item.name === name)?.amount ?? 0), 0),
     color: EXPENSE_COLORS[i % EXPENSE_COLORS.length],
   }));
 
   // Confirmed months table
   const confirmedMonths = computed.filter((m) => m.confirmed);
 
-  // Check if any month has custom investments
-  const hasCustomInvestments = computed.some(m => (m.customInvestments || []).length > 0);
-
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-gray-500 text-sm mt-1">
             Detailed financial analysis
           </p>
         </div>
         {/* Filter bar */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Year selector */}
           <div className="relative">
             <select
@@ -483,7 +501,7 @@ export default function Reports() {
       </div>
 
       {/* ── Summary Stat Cards ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           title="Income"
           value={formatCurrency(totalIncome)}
@@ -527,7 +545,7 @@ export default function Reports() {
       </div>
 
       {/* ── Additional Stat Cards ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           title="Avg. Monthly Income"
           value={formatCurrency(avgMonthlyIncome)}
@@ -554,17 +572,9 @@ export default function Reports() {
         />
         <StatCard
           title="Biggest Expense Category"
-          value={
-            biggestExpenseKey
-              ? EXPENSE_LABELS[biggestExpenseKey]
-              : '—'
-          }
+          value={biggestExpenseName ?? '—'}
           colorClass="text-red-600"
-          subtitle={
-            biggestExpenseKey
-              ? formatCurrency(expenseSumByKey[biggestExpenseKey])
-              : ''
-          }
+          subtitle={biggestExpenseName ? formatCurrency(expenseSumByName[biggestExpenseName]) : ''}
         />
         <StatCard
           title="Confirmed Months"
@@ -612,7 +622,7 @@ export default function Reports() {
 
       {/* ── Savings Gauge & Top Spending ──────────────────────────────────── */}
       <SectionHeader title="Savings Gauge & Top Spending" />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SavingsGauge pct={avgSavingsRate} />
         <TopExpenses data={topExpensesData} />
       </div>
@@ -620,7 +630,7 @@ export default function Reports() {
       {/* ── Income vs Expenses Bar Chart ─────────────────────────────────── */}
       <SectionHeader title="Income vs. Expenses by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={260}>
           <BarChart data={monthlyChartData} barSize={18} barCategoryGap="25%">
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -656,15 +666,15 @@ export default function Reports() {
       {/* ── Investment Allocation Over Time ───────────────────────────────── */}
       <SectionHeader title="Investment Allocation Over Time" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={260}>
           <BarChart data={investmentTimeData} barSize={28} barCategoryGap="25%">
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(1)}k`} />
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            {Object.keys(SAVINGS_LABELS).map((key, i, arr) => (
-              <Bar key={key} dataKey={SAVINGS_LABELS[key as keyof SavingsAllocation]} stackId="inv"
+            {investmentNames.map((name, i, arr) => (
+              <Bar key={name} dataKey={name} stackId="inv"
                 fill={SAVINGS_COLORS[i % SAVINGS_COLORS.length]}
                 radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
             ))}
@@ -674,19 +684,19 @@ export default function Reports() {
 
       {/* ── Property Income Stacked Bar ──────────────────────────────────── */}
       <SectionHeader title="Property Income by Month" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={300}>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
+        <ResponsiveContainer width="100%" height={260}>
           <BarChart data={propertyData} barSize={28} barCategoryGap="30%">
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Bar dataKey="Esposende" stackId="a" fill="#10b981" />
-            <Bar dataKey="Felgueiras" stackId="a" fill="#3b82f6" />
-            <Bar dataKey="Fradelos" stackId="a" fill="#f59e0b" />
-            <Bar dataKey="DocBay" stackId="a" fill="#8b5cf6" />
-            <Bar dataKey="Other Income" stackId="a" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+            {incomeNames.map((name, i, arr) => (
+              <Bar key={name} dataKey={name} stackId="a"
+                fill={INCOME_COLORS[i % INCOME_COLORS.length]}
+                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -694,35 +704,17 @@ export default function Reports() {
       {/* ── Expense Breakdown Stacked Bar ───────────────────────────────── */}
       <SectionHeader title="Expense Breakdown by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
-        <ResponsiveContainer width="100%" height={350}>
+        <ResponsiveContainer width="100%" height={260}>
           <BarChart data={expenseBreakdownData} barSize={32} barCategoryGap="25%">
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            {[
-              { key: 'Mortgage', color: '#ef4444' },
-              { key: 'Condo / Works', color: '#f97316' },
-              { key: 'Water', color: '#eab308' },
-              { key: 'Electricity', color: '#84cc16' },
-              { key: 'Internet', color: '#10b981' },
-              { key: 'Diesel', color: '#06b6d4' },
-              { key: 'Food', color: '#3b82f6' },
-              { key: 'Mechanic', color: '#8b5cf6' },
-              { key: 'Netflix', color: '#ec4899' },
-              { key: 'Phone', color: '#14b8a6' },
-              { key: 'Gym / Nutrition', color: '#f43f5e' },
-              { key: 'Going Out', color: '#a855f7' },
-              { key: 'Other', color: '#6366f1' },
-            ].map(({ key, color }, i, arr) => (
-              <Bar
-                key={key}
-                dataKey={key}
-                stackId="b"
-                fill={color}
-                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-              />
+            {expenseNames.map((name, i, arr) => (
+              <Bar key={name} dataKey={name} stackId="b"
+                fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]}
+                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -731,7 +723,7 @@ export default function Reports() {
       {/* ── Savings Rate Line ────────────────────────────────────────────── */}
       <SectionHeader title="Savings Rate by Month" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={220}>
           <LineChart data={savingsRateData}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -750,219 +742,133 @@ export default function Reports() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Bank Balance Line ─────────────────────────────────────────────── */}
-      <SectionHeader title="Bank Balance Over Time (TOTAL)" />
+      {/* ── Financial Health Ratios ───────────────────────────────────────── */}
+      <SectionHeader title="Financial Health Ratios" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Emergency Runway */}
+        {(() => {
+          const months = Math.max(0, runway);
+          const color = months >= 12 ? '#10b981' : months >= 6 ? '#f59e0b' : '#ef4444';
+          const label = months >= 12 ? 'Excellent' : months >= 6 ? 'Adequate' : 'Low';
+          const pct = Math.min((months / 24) * 100, 100);
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Emergency Runway</p>
+              <p className="text-3xl font-black tabular-nums" style={{ color }}>{months.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-1">mo</span></p>
+              <p className="text-xs text-gray-400 mt-0.5">Bank balance ÷ avg monthly expenses</p>
+              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(lastBalance)} ÷ {formatCurrency(avgMonthlyExpenses)}/mo</p>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+              </div>
+              <p className="text-xs font-medium mt-1.5" style={{ color }}>{label} · target ≥ 12 months</p>
+            </div>
+          );
+        })()}
+        {/* Expense Ratio */}
+        {(() => {
+          const color = expenseRatio <= 40 ? '#10b981' : expenseRatio <= 60 ? '#f59e0b' : '#ef4444';
+          const label = expenseRatio <= 40 ? 'Excellent' : expenseRatio <= 60 ? 'Watch' : 'High';
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Expense Ratio</p>
+              <p className="text-3xl font-black tabular-nums" style={{ color }}>{expenseRatio.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-0.5">%</span></p>
+              <p className="text-xs text-gray-400 mt-0.5">Total expenses ÷ total income</p>
+              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(totalExpenses)} ÷ {formatCurrency(totalIncome)}</p>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(expenseRatio, 100)}%`, backgroundColor: color }} />
+              </div>
+              <p className="text-xs font-medium mt-1.5" style={{ color }}>{label} · target ≤ 40%</p>
+            </div>
+          );
+        })()}
+        {/* Capital Outflow Rate */}
+        {(() => {
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Capital Outflow</p>
+              <p className="text-3xl font-black tabular-nums text-violet-600">{investmentRate.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-0.5">%</span></p>
+              <p className="text-xs text-gray-400 mt-0.5">Invest/Hol. column ÷ total income</p>
+              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(totalInvestments)} ÷ {formatCurrency(totalIncome)}</p>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all bg-violet-400" style={{ width: `${Math.min(investmentRate * 2, 100)}%` }} />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">Includes holidays, property, maintenance</p>
+            </div>
+          );
+        })()}
+        {/* Income Coverage Ratio */}
+        {(() => {
+          const color = coverageRatio >= 2.5 ? '#10b981' : coverageRatio >= 1.5 ? '#f59e0b' : '#ef4444';
+          const label = coverageRatio >= 2.5 ? 'Strong' : coverageRatio >= 1.5 ? 'Moderate' : 'Tight';
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Coverage Ratio</p>
+              <p className="text-3xl font-black tabular-nums" style={{ color }}>{coverageRatio.toFixed(2)}<span className="text-base font-semibold text-gray-400 ml-1">×</span></p>
+              <p className="text-xs text-gray-400 mt-0.5">Avg income ÷ avg expenses</p>
+              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(avgMonthlyIncome)}/mo ÷ {formatCurrency(avgMonthlyExpenses)}/mo</p>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((coverageRatio / 3) * 100, 100)}%`, backgroundColor: color }} />
+              </div>
+              <p className="text-xs font-medium mt-1.5" style={{ color }}>{label} · target ≥ 2.5×</p>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* ── Cumulative Cash Flow ──────────────────────────────────────────── */}
+      <SectionHeader title="Cumulative Cash Flow" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={balanceData}>
+        <p className="text-xs text-gray-400 mb-4">Running totals over the period — the gap between Income and Expenses is your accumulated net savings.</p>
+        <ResponsiveContainer width="100%" height={260}>
+          <AreaChart data={cumulativeData}>
             <defs>
-              <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+              <linearGradient id="cumIncGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="cumExpGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.12} />
+                <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(0)}k`} />
             <Tooltip content={<CurrencyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Area
-              type="monotone"
-              dataKey="Bank Balance"
-              stroke="#3b82f6"
-              strokeWidth={2.5}
-              fill="url(#balanceGrad)"
-              dot={{ r: 4, fill: '#3b82f6' }}
-            />
+            <Area type="monotone" dataKey="Income" stroke="#10b981" strokeWidth={2.5} fill="url(#cumIncGrad)" dot={false} />
+            <Area type="monotone" dataKey="Expenses" stroke="#ef4444" strokeWidth={2.5} fill="url(#cumExpGrad)" dot={false} />
+            <Line type="monotone" dataKey="Net" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: '#8b5cf6' }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
-      {/* ── Cumulative Savings Area ───────────────────────────────────────── */}
-      <SectionHeader title="Cumulative Savings for the Year (YTD)" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={anoData}>
-            <defs>
-              <linearGradient id="anoGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Area
-              type="monotone"
-              dataKey="Saved"
-              stroke="#8b5cf6"
-              strokeWidth={2.5}
-              fill="url(#anoGrad)"
-              dot={{ r: 4, fill: '#8b5cf6' }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      {/* ── Monthly Scorecard ─────────────────────────────────────────────── */}
+      <SectionHeader title="Monthly Scorecard" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        {momDeltas.map((m, i) => {
+          const color = m.rate >= 60 ? { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', badge: 'bg-emerald-500' }
+            : m.rate >= 40 ? { bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-700', badge: 'bg-sky-400' }
+            : m.rate >= 20 ? { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-400' }
+            : { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', badge: 'bg-red-400' };
+          const deltaSign = m.delta > 0 ? '+' : '';
+          return (
+            <div key={i} className={`rounded-xl border p-3 ${color.bg} ${color.border} ${!m.confirmed ? 'opacity-60' : ''}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-gray-700">{m.name}</span>
+                <span className={`w-2 h-2 rounded-full ${m.confirmed ? color.badge : 'bg-gray-300'}`} />
+              </div>
+              <p className={`text-xl font-black tabular-nums ${color.text}`}>{m.rate.toFixed(0)}<span className="text-xs font-semibold">%</span></p>
+              <p className="text-xs text-gray-500 mt-0.5 tabular-nums">{formatCurrency(m.guardado)}</p>
+              {i > 0 && (
+                <p className={`text-xs font-semibold mt-1 tabular-nums ${m.delta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {deltaSign}{m.delta.toFixed(1)}pp
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
-
-      {/* ── Custom Investments Breakdown ─────────────────────────────────── */}
-      {hasCustomInvestments && (
-        <>
-          <SectionHeader title="Additional Investments by Month" />
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Month</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {computed.flatMap(m =>
-                    (m.customInvestments || []).map(item => (
-                      <tr key={`${m.id}-${item.id}`} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap font-medium">
-                          {MONTH_NAMES_PT[m.month - 1]} {m.year}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{item.name || '—'}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-violet-600 whitespace-nowrap">
-                          {formatCurrency(item.amount)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Confirmed Months Summary Table ──────────────────────────────── */}
-      {confirmedMonths.length > 0 && (
-        <>
-          <SectionHeader title="Summary — Confirmed Months" />
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {[
-                      'Month',
-                      'Income',
-                      'G.R.',
-                      'G.EX.',
-                      'Investments',
-                      'Cash Out',
-                      'Saved',
-                      '(%)',
-                      'YTD',
-                      'Balance',
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {confirmedMonths.map((m) => (
-                    <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-gray-800 whitespace-nowrap flex items-center gap-2">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                        {MONTH_NAMES_PT[m.month - 1]} {m.year}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-emerald-600 whitespace-nowrap">
-                        {formatCurrency(m.calc.cashIn)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-gray-600 whitespace-nowrap">
-                        {formatCurrency(m.calc.gastosR)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-red-500 whitespace-nowrap">
-                        {formatCurrency(m.calc.gastosEx)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-violet-600 whitespace-nowrap">
-                        {formatCurrency(m.calc.savingsTotal)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-red-600 whitespace-nowrap">
-                        {formatCurrency(m.calc.cashOut)}
-                      </td>
-                      <td
-                        className={`px-4 py-3 text-right tabular-nums font-bold whitespace-nowrap ${
-                          m.calc.guardado >= 0 ? 'text-violet-700' : 'text-red-700'
-                        }`}
-                      >
-                        {formatCurrency(m.calc.guardado)}
-                      </td>
-                      <td
-                        className={`px-4 py-3 text-right tabular-nums whitespace-nowrap ${
-                          m.calc.savingsPct >= 50
-                            ? 'text-emerald-600'
-                            : m.calc.savingsPct >= 30
-                            ? 'text-yellow-600'
-                            : 'text-red-500'
-                        }`}
-                      >
-                        {formatPct(m.calc.savingsPct)}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-violet-600 whitespace-nowrap">
-                        {formatCurrency(m.ano)}
-                      </td>
-                      <td
-                        className={`px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap ${
-                          m.totalBalance >= 0 ? 'text-blue-600' : 'text-red-600'
-                        }`}
-                      >
-                        {formatCurrency(m.totalBalance)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                {/* Totals */}
-                <tfoot>
-                  <tr className="bg-gray-100 border-t-2 border-gray-300 font-bold">
-                    <td className="px-4 py-3 text-gray-800 whitespace-nowrap">TOTAL</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-emerald-700 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths.reduce((s, m) => s + m.calc.cashIn, 0))}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-700 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths.reduce((s, m) => s + m.calc.gastosR, 0))}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-red-600 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths.reduce((s, m) => s + m.calc.gastosEx, 0))}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-violet-700 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths.reduce((s, m) => s + m.calc.savingsTotal, 0))}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-red-700 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths.reduce((s, m) => s + m.calc.cashOut, 0))}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-violet-700 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths.reduce((s, m) => s + m.calc.guardado, 0))}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-600 whitespace-nowrap">
-                      {formatPct(
-                        confirmedMonths.reduce((s, m) => s + m.calc.savingsPct, 0) /
-                          confirmedMonths.length
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap text-gray-400">—</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-blue-700 whitespace-nowrap">
-                      {formatCurrency(confirmedMonths[confirmedMonths.length - 1]?.totalBalance ?? 0)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

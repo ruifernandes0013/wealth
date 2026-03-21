@@ -30,7 +30,7 @@ export default function StatCard({
           </div>
         )}
       </div>
-      <p className={`text-2xl font-bold ${colorClass} leading-tight`}>
+      <p className={`text-xl md:text-2xl font-bold ${colorClass} leading-tight`}>
         {value}
       </p>
       {subtitle && (
