@@ -388,6 +388,16 @@ export default function Monthly() {
     incomeTotals[name] = computed.reduce((s, m) => s + (m.incomeItems.find(i => i.name === name)?.amount ?? 0), 0);
   });
 
+  const expenseTotals: Record<string, number> = {};
+  expenseNames.forEach(name => {
+    expenseTotals[name] = computed.reduce((s, m) => s + (m.expenseItems.find(i => i.name === name)?.amount ?? 0), 0);
+  });
+
+  const investmentTotals: Record<string, number> = {};
+  investmentNames.forEach(name => {
+    investmentTotals[name] = computed.reduce((s, m) => s + (m.investmentItems.find(i => i.name === name)?.amount ?? 0), 0);
+  });
+
   const avgSavingsPct = computed.length > 0
     ? computed.reduce((s, m) => s + m.calc.savingsPct, 0) / computed.length : 0;
 
@@ -682,7 +692,11 @@ export default function Monthly() {
               <tfoot>
                 <tr className="bg-emerald-700 text-white font-bold border-t-2 border-emerald-400">
                   <td className="sticky left-0 z-10 bg-emerald-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-emerald-500">TOTAL</td>
-                  {incomeNames.map(name => <td key={name} />)}
+                  {incomeNames.map(name => (
+                    <td key={name} className="px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap text-emerald-100">
+                      {formatCurrency(incomeTotals[name] ?? 0)}
+                    </td>
+                  ))}
                   <td className="bg-emerald-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-emerald-500">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.cashIn, 0))}
                   </td>
@@ -747,7 +761,11 @@ export default function Monthly() {
               <tfoot>
                 <tr className="bg-red-700 text-white font-bold border-t-2 border-red-400">
                   <td className="sticky left-0 z-10 bg-red-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-red-500">TOTAL</td>
-                  {expenseNames.map(name => <td key={name} />)}
+                  {expenseNames.map(name => (
+                    <td key={name} className="px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap text-red-100">
+                      {formatCurrency(expenseTotals[name] ?? 0)}
+                    </td>
+                  ))}
                   <td className="bg-red-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-red-500">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.gastosR, 0))}
                   </td>
@@ -812,7 +830,11 @@ export default function Monthly() {
               <tfoot>
                 <tr className="bg-violet-700 text-white font-bold border-t-2 border-violet-400">
                   <td className="sticky left-0 z-10 bg-violet-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-violet-500">TOTAL</td>
-                  {investmentNames.map(name => <td key={name} />)}
+                  {investmentNames.map(name => (
+                    <td key={name} className="px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap text-violet-100">
+                      {formatCurrency(investmentTotals[name] ?? 0)}
+                    </td>
+                  ))}
                   <td className="bg-violet-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-violet-500">
                     {formatCurrency(computed.reduce((s, m) => s + m.calc.savingsTotal, 0))}
                   </td>
