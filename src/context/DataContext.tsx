@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, useRef, ReactNode } from 'react';
 import type { MonthMeta, LineItem, YearConfig, AppState } from '../types';
 import { seedMonths, seedIncome, seedExpenses, seedInvestments, seedYearConfigs } from '../data/seed';
 import { supabase } from '../lib/supabase';
@@ -73,6 +73,10 @@ function rowToMonthMeta(row: Record<string, unknown>): MonthMeta {
 interface DataContextValue {
   state: AppState;
   loading: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
   updateMonthMeta: (meta: MonthMeta) => Promise<void>;
   upsertLineItem: (table: 'income' | 'expenses' | 'investments', item: LineItem) => Promise<void>;
   deleteLineItem: (table: 'income' | 'expenses' | 'investments', id: string) => Promise<void>;
@@ -91,6 +95,98 @@ export function DataProvider({ children }: { children: ReactNode }) {
     months: [], income: [], expenses: [], investments: [], yearConfigs: [],
   });
   const [loading, setLoading] = useState(true);
+
+  // Undo/redo history
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+  const historyRef = useRef<{ past: AppState[]; future: AppState[] }>({ past: [], future: [] });
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  function pushHistory() {
+    const snap: AppState = JSON.parse(JSON.stringify(stateRef.current));
+    const h = historyRef.current;
+    h.past.push(snap);
+    if (h.past.length > 50) h.past.shift();
+    h.future = [];
+    setCanUndo(true);
+    setCanRedo(false);
+  }
+
+  async function syncDiff(from: AppState, to: AppState) {
+    const u = userRef.current;
+    if (!u) return;
+    const lineTables = ['income', 'expenses', 'investments'] as const;
+    for (const tbl of lineTables) {
+      const fromItems = from[tbl];
+      const toItems = to[tbl];
+      const toUpsert = toItems.filter(item => {
+        const f = fromItems.find(i => i.id === item.id);
+        return !f || JSON.stringify(f) !== JSON.stringify(item);
+      });
+      const toDelete = fromItems.filter(item => !toItems.find(i => i.id === item.id));
+      if (toUpsert.length) {
+        await supabase.from(tbl).upsert(
+          toUpsert.map(item => ({
+            id: item.id, user_id: u.id, year: item.year, month: item.month,
+            name: item.name, amount: item.amount, note: item.note ?? null, sort_order: item.sortOrder ?? 0,
+          })),
+          { onConflict: 'id' }
+        );
+      }
+      for (const item of toDelete) {
+        await supabase.from(tbl).delete().eq('id', item.id).eq('user_id', u.id);
+      }
+    }
+    // months — only upsert changes, never delete
+    const changedMonths = to.months.filter(m => {
+      const f = from.months.find(x => x.id === m.id);
+      return !f || JSON.stringify(f) !== JSON.stringify(m);
+    });
+    for (const m of changedMonths) {
+      await supabase.from('months').upsert({
+        id: m.id, user_id: u.id, year: m.year, month: m.month,
+        confirmed: m.confirmed, gastos_ex_override: m.gastosExOverride,
+      });
+    }
+    // yearConfigs
+    const changedConfigs = to.yearConfigs.filter(c => {
+      const f = from.yearConfigs.find(x => x.year === c.year);
+      return !f || JSON.stringify(f) !== JSON.stringify(c);
+    });
+    for (const c of changedConfigs) {
+      await supabase.from('year_configs').upsert(
+        { user_id: u.id, year: c.year, initial_balance: c.initialBalance },
+        { onConflict: 'user_id,year' }
+      );
+    }
+  }
+
+  const undo = async () => {
+    const h = historyRef.current;
+    if (h.past.length === 0) return;
+    const prev = h.past.pop()!;
+    const current: AppState = JSON.parse(JSON.stringify(stateRef.current));
+    h.future.unshift(current);
+    dispatch({ type: 'SET_STATE', payload: prev });
+    setCanUndo(h.past.length > 0);
+    setCanRedo(true);
+    await syncDiff(current, prev);
+  };
+
+  const redo = async () => {
+    const h = historyRef.current;
+    if (h.future.length === 0) return;
+    const next = h.future.shift()!;
+    const current: AppState = JSON.parse(JSON.stringify(stateRef.current));
+    h.past.push(current);
+    dispatch({ type: 'SET_STATE', payload: next });
+    setCanUndo(true);
+    setCanRedo(h.future.length > 0);
+    await syncDiff(current, next);
+  };
 
   useEffect(() => {
     if (!user) {
@@ -186,6 +282,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateMonthMeta = async (meta: MonthMeta) => {
     if (!user) return;
+    pushHistory();
     dispatch({ type: 'UPDATE_MONTH_META', payload: meta });
     const { error } = await supabase.from('months').upsert({
       id: meta.id,
@@ -200,6 +297,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const upsertLineItem = async (table: 'income' | 'expenses' | 'investments', item: LineItem) => {
     if (!user) return;
+    pushHistory();
     dispatch({ type: 'UPSERT_LINE_ITEM', table, payload: item });
     const { error } = await supabase.from(table).upsert({
       id: item.id,
@@ -216,6 +314,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const deleteLineItem = async (table: 'income' | 'expenses' | 'investments', id: string) => {
     if (!user) return;
+    pushHistory();
     dispatch({ type: 'DELETE_LINE_ITEM', table, id });
     const { error } = await supabase.from(table).delete().eq('id', id).eq('user_id', user.id);
     if (error) console.error(`[deleteLineItem:${table}] Supabase error:`, error.message, error.details);
@@ -228,6 +327,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     name: string
   ) => {
     if (!user) return;
+    pushHistory();
     // Insert for all 12 months of the year
     const monthMetas = state.months.filter(m => m.year === year);
     const rows = monthMetas.map(m => ({
@@ -251,6 +351,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateYearConfig = async (config: YearConfig) => {
     if (!user) return;
+    pushHistory();
     dispatch({ type: 'UPDATE_YEAR_CONFIG', payload: config });
     const { error } = await supabase.from('year_configs').upsert({
       user_id: user.id,
@@ -275,6 +376,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       state, loading,
+      canUndo, canRedo, undo, redo,
       updateMonthMeta, upsertLineItem, deleteLineItem, addLineItem,
       updateYearConfig, getMonthsForYear, getYearConfig, getAvailableYears,
     }}>
