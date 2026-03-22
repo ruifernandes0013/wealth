@@ -329,7 +329,7 @@ export default function Reports() {
     name: MONTH_NAMES_PT[m.month - 1],
     Income: m.calc.cashIn,
     Expenses: m.calc.gastosEx,
-    Investments: m.calc.savingsTotal,
+    Extraordinary: m.calc.savingsTotal,
     Saved: m.calc.guardado,
   }));
 
@@ -411,6 +411,25 @@ export default function Reports() {
     cashIn: m.calc.cashIn,
     confirmed: m.confirmed,
   }));
+
+  // ── Extraordinary metrics ────────────────────────────────────────────────
+  const totalExtraordinary = computed.reduce((s, m) => s + m.calc.savingsTotal, 0);
+  const extraordinaryPctOfIncome = totalIncome > 0 ? (totalExtraordinary / totalIncome) * 100 : 0;
+  const avgExtraordinaryPerMonth = computed.length > 0 ? totalExtraordinary / computed.length : 0;
+  const activeExtraordinaryMonths = computed.filter(m => m.calc.savingsTotal > 0).length;
+  const peakExtraordinaryMonth = computed.reduce(
+    (best, m) => m.calc.savingsTotal > best.calc.savingsTotal ? m : best,
+    computed[0] ?? { calc: { savingsTotal: 0 }, month: 0 }
+  );
+  const extraordinarySumByName: Record<string, number> = {};
+  computed.forEach(m => {
+    m.investmentItems.forEach(item => {
+      extraordinarySumByName[item.name] = (extraordinarySumByName[item.name] ?? 0) + item.amount;
+    });
+  });
+  const biggestExtraordinaryName = Object.keys(extraordinarySumByName).sort(
+    (a, b) => extraordinarySumByName[b] - extraordinarySumByName[a]
+  )[0];
 
   // Top expenses data for horizontal bar (dynamic)
   const topExpensesData = expenseNames.map((name, i) => ({
@@ -559,10 +578,10 @@ export default function Reports() {
           subtitle="Simple average all months"
         />
         <StatCard
-          title="Avg. Monthly Investment"
-          value={formatCurrency(avgMonthlySavings)}
+          title="Avg. Monthly Extraordinary"
+          value={formatCurrency(avgExtraordinaryPerMonth)}
           colorClass="text-violet-600"
-          subtitle="Average saved per month"
+          subtitle="Avg. extraordinary spend/month"
         />
         <StatCard
           title="Months with >60% Rate"
@@ -600,6 +619,37 @@ export default function Reports() {
         />
       </div>
 
+      {/* ── Extraordinary ─────────────────────────────────────────────────── */}
+      <SectionHeader title="Extraordinary" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard
+          title="Total Extraordinary"
+          value={formatCurrency(totalExtraordinary)}
+          colorClass="text-violet-600"
+          subtitle={`${activeExtraordinaryMonths} active month${activeExtraordinaryMonths !== 1 ? 's' : ''}`}
+        />
+        <StatCard
+          title="% of Income"
+          value={formatPct(extraordinaryPctOfIncome)}
+          colorClass={extraordinaryPctOfIncome > 30 ? 'text-red-600' : 'text-violet-600'}
+          subtitle="Extraordinary ÷ total income"
+        />
+        <StatCard
+          title="Biggest Category"
+          value={biggestExtraordinaryName ?? '—'}
+          colorClass="text-violet-600"
+          subtitle={biggestExtraordinaryName ? formatCurrency(extraordinarySumByName[biggestExtraordinaryName]) : ''}
+        />
+        <StatCard
+          title="Peak Month"
+          value={peakExtraordinaryMonth && peakExtraordinaryMonth.calc.savingsTotal > 0
+            ? `${MONTH_NAMES_PT[(peakExtraordinaryMonth.month ?? 1) - 1]} ${formatCurrency(peakExtraordinaryMonth.calc.savingsTotal)}`
+            : '—'}
+          colorClass="text-violet-600"
+          subtitle="Highest extraordinary spend"
+        />
+      </div>
+
       {/* ── Distribution Donuts ───────────────────────────────────────────── */}
       <SectionHeader title="Distribution" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -614,7 +664,7 @@ export default function Reports() {
           colors={EXPENSE_COLORS}
         />
         <DonutChart
-          title="Investment Allocation"
+          title="Extraordinary Allocation"
           data={investmentAllocations}
           colors={SAVINGS_COLORS}
         />
@@ -639,7 +689,7 @@ export default function Reports() {
             <Legend wrapperStyle={{ fontSize: 13 }} />
             <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Investments" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Extraordinary" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -663,8 +713,8 @@ export default function Reports() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Investment Allocation Over Time ───────────────────────────────── */}
-      <SectionHeader title="Investment Allocation Over Time" />
+      {/* ── Extraordinary Over Time ───────────────────────────────────────── */}
+      <SectionHeader title="Extraordinary Over Time" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={investmentTimeData} barSize={28} barCategoryGap="25%">
@@ -787,12 +837,12 @@ export default function Reports() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Capital Outflow</p>
               <p className="text-3xl font-black tabular-nums text-violet-600">{investmentRate.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-0.5">%</span></p>
-              <p className="text-xs text-gray-400 mt-0.5">Invest/Hol. column ÷ total income</p>
+              <p className="text-xs text-gray-400 mt-0.5">Extraordinary column ÷ total income</p>
               <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(totalInvestments)} ÷ {formatCurrency(totalIncome)}</p>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all bg-violet-400" style={{ width: `${Math.min(investmentRate * 2, 100)}%` }} />
               </div>
-              <p className="text-xs text-gray-400 mt-1.5">Includes holidays, property, maintenance</p>
+              <p className="text-xs text-gray-400 mt-1.5">One-off, non-recurring capital events</p>
             </div>
           );
         })()}

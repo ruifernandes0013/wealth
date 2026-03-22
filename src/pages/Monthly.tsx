@@ -758,9 +758,9 @@ export default function Monthly() {
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            INVESTMENTS & HOLIDAYS BREAKDOWN TABLE
+            EXTRAORDINARY BREAKDOWN TABLE
         ═══════════════════════════════════════════════════════════════════ */}
-        <TableHeader title="Investments & Holidays Breakdown" color="violet"
+        <TableHeader title="Extraordinary Breakdown" color="violet"
           adding={addingCol === 'investment'} addValue={newColName}
           onAddChange={setNewColName} onAddStart={() => setAddingCol('investment')}
           onAddConfirm={() => addColumn('investment')}
