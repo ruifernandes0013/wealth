@@ -247,7 +247,7 @@ export default function Reports() {
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
-  const allComputed = calcYearMonths(months, state.income, state.expenses, state.investments, yearConfig.initialBalance);
+  const allComputed = calcYearMonths(months, state.income, state.expenses, state.investments, state.savings, yearConfig.initialBalance, state.savings);
 
   // Dynamic column names sorted by sortOrder
   function getUniqueNames(items: { year: number; name: string; sortOrder?: number }[], year: number): string[] {

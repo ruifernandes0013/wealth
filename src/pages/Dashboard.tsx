@@ -15,22 +15,22 @@ import {
   PiggyBank,
   Percent,
   Landmark,
-  ChevronDown,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
 import StatCard from '../components/StatCard';
+import YearSelector from '../components/YearSelector';
 import { MONTH_NAMES_PT } from '../types';
 
 export default function Dashboard() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear } = useData();
   const availableYears = getAvailableYears();
   const [selectedYear, setSelectedYear] = useState(availableYears[0] ?? 2026);
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
-  const computed = calcYearMonths(months, state.income, state.expenses, state.investments, yearConfig.initialBalance);
+  const computed = calcYearMonths(months, state.income, state.expenses, state.investments, state.savings, yearConfig.initialBalance, state.savings);
 
   // YTD sums
   const totalIncome = computed.reduce((s, m) => s + m.calc.cashIn, 0);
@@ -68,20 +68,12 @@ export default function Dashboard() {
         </div>
 
         {/* Year selector */}
-        <div className="relative">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
-          >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
+        <YearSelector
+          selectedYear={selectedYear}
+          availableYears={availableYears}
+          onSelectYear={setSelectedYear}
+          onCreateYear={addYear}
+        />
       </div>
 
       {/* Stat cards */}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle, ChevronDown, Loader2, Circle, MessageSquare, Plus } from 'lucide-react';
+import { CheckCircle, Loader2, Circle, MessageSquare, Plus, Clipboard, X } from 'lucide-react';
+import YearSelector from '../components/YearSelector';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -18,7 +19,7 @@ import type { MonthWithCalc, LineItem } from '../types';
 
 // ── Sub-section header ────────────────────────────────────────────────────────
 function TableHeader({ title, color, adding, addValue, onAddChange, onAddStart, onAddConfirm, onAddCancel }: {
-  title: string; color: 'red' | 'violet' | 'emerald';
+  title: string; color: 'red' | 'violet' | 'emerald' | 'teal';
   adding?: boolean; addValue?: string;
   onAddChange?: (v: string) => void; onAddStart?: () => void;
   onAddConfirm?: () => void; onAddCancel?: () => void;
@@ -27,6 +28,7 @@ function TableHeader({ title, color, adding, addValue, onAddChange, onAddStart, 
     red: 'text-red-700 border-red-200',
     violet: 'text-violet-700 border-violet-200',
     emerald: 'text-emerald-700 border-emerald-200',
+    teal: 'text-teal-700 border-teal-200',
   };
   return (
     <div className="flex items-center gap-2 mt-2">
@@ -54,7 +56,7 @@ function TableHeader({ title, color, adding, addValue, onAddChange, onAddStart, 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ActiveNote {
-  table: 'income' | 'expenses' | 'investments';
+  table: 'income' | 'expenses' | 'investments' | 'savings';
   itemId: string;
   label: string;
   value: string;
@@ -62,7 +64,7 @@ interface ActiveNote {
 }
 
 interface EditCellState {
-  table: 'income' | 'expenses' | 'investments' | 'gastosEx';
+  table: 'income' | 'expenses' | 'investments' | 'savings' | 'gastosEx';
   year: number;
   month: number;
   name: string;
@@ -222,31 +224,33 @@ function getUniqueNames(items: LineItem[], year: number): string[] {
 export default function Monthly() {
   const {
     state, loading,
-    upsertLineItem, addLineItem, deleteLineItem, updateMonthMeta, updateYearConfig,
+    upsertLineItem, addLineItem, deleteLineItem, updateMonthMeta, updateYearConfig, addYear,
     getMonthsForYear, getYearConfig, getAvailableYears,
+    selectedYear, selectedMonth, setSelectedYear, setSelectedMonth,
   } = useData();
 
   const availableYears = getAvailableYears();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [balanceInput, setBalanceInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
   const [activeNote, setActiveNote] = useState<ActiveNote | null>(null);
-  const [addingCol, setAddingCol] = useState<'income' | 'expense' | 'investment' | null>(null);
+  const [addingCol, setAddingCol] = useState<'income' | 'expense' | 'investment' | 'savings' | null>(null);
   const [newColName, setNewColName] = useState('');
   const [editCell, setEditCell] = useState<EditCellState | null>(null);
   const [editCellVal, setEditCellVal] = useState('');
+  const [copiedValue, setCopiedValue] = useState<number | null>(null);
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
-  const computed = calcYearMonths(months, state.income, state.expenses, state.investments, yearConfig.initialBalance);
+  const computed = calcYearMonths(months, state.income, state.expenses, state.investments, state.savings, yearConfig.initialBalance, state.savings);
 
   const today = new Date();
-  const currentMonth = today.getFullYear() === selectedYear ? today.getMonth() + 1 : -1;
+  const currentMonth = selectedMonth;
 
   // Dynamic column names sorted by sortOrder
   const incomeNames = getUniqueNames(state.income, selectedYear);
   const expenseNames = getUniqueNames(state.expenses, selectedYear);
   const investmentNames = getUniqueNames(state.investments, selectedYear);
+  const savingsAccountNames = getUniqueNames(state.savings, selectedYear);
 
   const handleSaveBalance = () => {
     const val = parseFloat(balanceInput.replace(',', '.'));
@@ -291,21 +295,39 @@ export default function Monthly() {
     setEditCellVal('');
   };
 
-  const addColumn = async (section: 'income' | 'expense' | 'investment') => {
+  const saveValueDirect = async (
+    table: 'income' | 'expenses' | 'investments' | 'savings',
+    year: number, month: number, name: string,
+    val: number, item: LineItem | undefined,
+  ) => {
+    if (item) {
+      await upsertLineItem(table, { ...item, amount: val });
+    } else {
+      await upsertLineItem(table, { id: crypto.randomUUID(), year, month, name, amount: val, sortOrder: 99 });
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setCopiedValue(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const addColumn = async (section: 'income' | 'expense' | 'investment' | 'savings') => {
     const name = newColName.trim();
     if (!name) { setAddingCol(null); setNewColName(''); return; }
-    const table = section === 'income' ? 'income' : section === 'expense' ? 'expenses' : 'investments';
+    const table = section === 'income' ? 'income' : section === 'expense' ? 'expenses' : section === 'savings' ? 'savings' : 'investments';
     await addLineItem(table, selectedYear, 1, name);
     setAddingCol(null);
     setNewColName('');
   };
 
-  const deleteColumn = async (table: 'income' | 'expenses' | 'investments', name: string) => {
+  const deleteColumn = async (table: 'income' | 'expenses' | 'investments' | 'savings', name: string) => {
     const items = state[table].filter(i => i.year === selectedYear && i.name === name);
     await Promise.all(items.map(i => deleteLineItem(table, i.id)));
   };
 
-  const reorderColumns = async (table: 'income' | 'expenses' | 'investments', newOrder: string[]) => {
+  const reorderColumns = async (table: 'income' | 'expenses' | 'investments' | 'savings', newOrder: string[]) => {
     const updates = newOrder.flatMap((name, newIdx) =>
       state[table].filter(i => i.year === selectedYear && i.name === name)
         .map(i => upsertLineItem(table, { ...i, sortOrder: newIdx }))
@@ -314,7 +336,7 @@ export default function Monthly() {
   };
 
   const renameColumn = async (
-    table: 'income' | 'expenses' | 'investments',
+    table: 'income' | 'expenses' | 'investments' | 'savings',
     oldName: string,
     newName: string
   ) => {
@@ -333,7 +355,7 @@ export default function Monthly() {
   const [zoomIdx, setZoomIdx] = useState(isMobile ? 0 : 2); // 70% mobile, 90% desktop
   const zoom = ZOOM_STEPS[zoomIdx];
 
-  const handleDragEnd = (table: 'income' | 'expenses' | 'investments', names: string[]) =>
+  const handleDragEnd = (table: 'income' | 'expenses' | 'investments' | 'savings', names: string[]) =>
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
@@ -345,7 +367,7 @@ export default function Monthly() {
 
   const openNote = (
     e: React.MouseEvent,
-    table: 'income' | 'expenses' | 'investments',
+    table: 'income' | 'expenses' | 'investments' | 'savings',
     item: LineItem,
     label: string,
   ) => {
@@ -380,8 +402,9 @@ export default function Monthly() {
     gastosEx: acc.gastosEx + m.calc.gastosEx,
     saldo: acc.saldo + m.calc.saldo,
     savingsTotal: acc.savingsTotal + m.calc.savingsTotal,
+    savingsDeposits: acc.savingsDeposits + m.calc.savingsDeposits,
     guardado: acc.guardado + m.calc.guardado,
-  }), { cashIn: 0, cashOut: 0, gastosR: 0, gastosEx: 0, saldo: 0, savingsTotal: 0, guardado: 0 });
+  }), { cashIn: 0, cashOut: 0, gastosR: 0, gastosEx: 0, saldo: 0, savingsTotal: 0, savingsDeposits: 0, guardado: 0 });
 
   const incomeTotals: Record<string, number> = {};
   incomeNames.forEach(name => {
@@ -398,6 +421,11 @@ export default function Monthly() {
     investmentTotals[name] = computed.reduce((s, m) => s + (m.investmentItems.find(i => i.name === name)?.amount ?? 0), 0);
   });
 
+  const savingsAccountTotals: Record<string, number> = {};
+  savingsAccountNames.forEach(name => {
+    savingsAccountTotals[name] = computed.reduce((s, m) => s + (m.savingsItems.find(i => i.name === name)?.amount ?? 0), 0);
+  });
+
   const avgSavingsPct = computed.length > 0
     ? computed.reduce((s, m) => s + m.calc.savingsPct, 0) / computed.length : 0;
 
@@ -405,9 +433,7 @@ export default function Monthly() {
 
   const rowStyle = (m: MonthWithCalc) => {
     const isCurrent = m.month === currentMonth;
-    const isProjected = !m.confirmed && !isCurrent;
     if (isCurrent) return { row: 'bg-sky-50 hover:bg-sky-100/70', sticky: 'bg-sky-50', text: 'text-sky-700', muted: 'text-sky-600/60', projected: false };
-    if (isProjected) return { row: 'bg-gray-50/60 hover:bg-gray-100/60', sticky: 'bg-gray-50/60', text: 'text-gray-400', muted: 'text-gray-300', projected: true };
     return { row: 'bg-white hover:bg-gray-50', sticky: 'bg-white', text: 'text-gray-800', muted: 'text-gray-500', projected: false };
   };
 
@@ -417,7 +443,7 @@ export default function Monthly() {
   // ── Inline editable + notable breakdown cell ──────────────────────────────
   const EC = (
     m: MonthWithCalc,
-    table: 'income' | 'expenses' | 'investments',
+    table: 'income' | 'expenses' | 'investments' | 'savings',
     name: string,
     item: LineItem | undefined,
     colorClass: string,
@@ -426,13 +452,24 @@ export default function Monthly() {
     const value = item?.amount ?? 0;
     const note = item?.note ?? '';
     const isEditing = editCell?.table === table && editCell.month === m.month && editCell.name === name;
+    const isPasteMode = copiedValue !== null;
+    const handleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isPasteMode) {
+        saveValueDirect(table, m.year, m.month, name, copiedValue, item);
+      } else if (!isEditing) {
+        startEdit(table, m.year, m.month, name, value);
+      }
+    };
     return (
       <td
         key={`${m.id}-${table}-${name}`}
         className={`relative group/ec px-1.5 py-1.5 text-right tabular-nums text-xs whitespace-nowrap ${
-          isEditing ? 'ring-1 ring-inset ring-violet-400 bg-violet-50/40' : 'cursor-pointer'
+          isEditing ? 'ring-1 ring-inset ring-violet-400 bg-violet-50/40'
+          : isPasteMode ? 'cursor-copy hover:ring-1 hover:ring-inset hover:ring-sky-400 hover:bg-sky-50/40'
+          : 'cursor-pointer'
         } ${colorClass} ${extraClass}`}
-        onClick={e => { e.stopPropagation(); if (!isEditing) startEdit(table, m.year, m.month, name, value); }}
+        onClick={handleClick}
       >
         {isEditing ? (
           <input
@@ -444,7 +481,7 @@ export default function Monthly() {
             className="w-full text-right bg-transparent focus:outline-none tabular-nums text-xs"
           />
         ) : formatCurrency(value)}
-        {!isEditing && item && (
+        {!isEditing && !isPasteMode && item && (
           <>
             <button type="button"
               onClick={e => { e.stopPropagation(); openNote(e, table, item, name); }}
@@ -455,6 +492,13 @@ export default function Monthly() {
             </button>
             {note && <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-amber-400 rounded-full pointer-events-none" />}
           </>
+        )}
+        {!isEditing && !isPasteMode && (
+          <button type="button"
+            onClick={e => { e.stopPropagation(); setCopiedValue(value); }}
+            className="absolute top-0.5 left-0.5 rounded p-0.5 transition-all z-10 opacity-0 group-hover/ec:opacity-100 text-gray-300 hover:text-sky-500">
+            <Clipboard className="w-2.5 h-2.5" />
+          </button>
         )}
       </td>
     );
@@ -489,7 +533,8 @@ export default function Monthly() {
   return (
     <div className="space-y-5">
 
-        {/* Header */}
+        {/* Sticky header */}
+        <div className="sticky top-14 md:top-16 z-30 bg-gray-50 pb-3 pt-1 -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-gray-100 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Monthly Cash Flow</h1>
@@ -506,13 +551,12 @@ export default function Monthly() {
               <button onClick={() => setZoomIdx(i => Math.min(ZOOM_STEPS.length - 1, i + 1))} disabled={zoomIdx === ZOOM_STEPS.length - 1}
                 className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 font-bold text-base leading-none">+</button>
             </div>
-            <div className="relative">
-              <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}
-                className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer">
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+            <YearSelector
+              selectedYear={selectedYear}
+              availableYears={availableYears}
+              onSelectYear={y => { void setSelectedYear(y); void setSelectedMonth(today.getMonth() + 1); }}
+              onCreateYear={addYear}
+            />
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
               <span className="text-xs text-gray-400">Opening balance:</span>
               {editingBalance ? (
@@ -537,7 +581,15 @@ export default function Monthly() {
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Confirmed</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-400" /> Current month</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-300" /> Projection</span>
+          {copiedValue !== null && (
+            <span className="flex items-center gap-1.5 bg-sky-50 border border-sky-200 text-sky-700 rounded-lg px-2.5 py-1 font-medium">
+              <Clipboard className="w-3 h-3" />
+              Paste mode: {formatCurrency(copiedValue)} — click cells to paste
+              <button onClick={() => setCopiedValue(null)} className="ml-1 hover:text-sky-900"><X className="w-3 h-3" /></button>
+            </span>
+          )}
         </div>
+        </div>{/* end sticky header */}
 
         {/* ═══════════════════════════════════════════════════════════════════
             MAIN CASHFLOW TABLE
@@ -549,8 +601,8 @@ export default function Monthly() {
                 <tr>
                   <th rowSpan={2} className="sticky left-0 z-20 bg-gray-900 text-white px-2 py-2 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-gray-700 align-middle">MONTH</th>
                   <th colSpan={incomeGroupColspan} className="bg-emerald-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-emerald-700">INCOME</th>
-                  <th colSpan={5} className="bg-red-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-red-700">OUTGOING</th>
-                  <th colSpan={4} className="bg-violet-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-violet-700">RESULT</th>
+                  <th colSpan={6} className="bg-red-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-red-700">OUTGOING</th>
+                  <th colSpan={5} className="bg-violet-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-violet-700">RESULT</th>
                   <th rowSpan={2} className="bg-gray-800 text-white text-center px-2 py-1 text-xs border-l border-gray-700 align-middle cursor-pointer">✓</th>
                 </tr>
                 <tr>
@@ -563,10 +615,12 @@ export default function Monthly() {
                   <th className={`${thBase} bg-red-700/80 text-red-100`}>G.REAL</th>
                   <th className={`${thBase} bg-red-700/80 text-red-100`}>SALDO</th>
                   <th className={`${thBase} bg-red-700/80 text-red-100`}>INVEST/HOL.</th>
+                  <th className={`${thBase} bg-red-700/80 text-red-100`}>SAVINGS</th>
                   <th className={`${thBase} bg-red-900 text-red-200 border-l border-red-600 font-bold`}>CASH OUT</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100 border-l border-violet-600 font-bold`}>SAVED</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100`}>RATE</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100`}>YTD</th>
+                  <th className={`${thBase} bg-violet-700/80 text-violet-100`}>SAV.BAL</th>
                   <th className={`${thBase} bg-violet-900 text-violet-200 border-l border-violet-600 font-bold`}>BALANCE</th>
                 </tr>
               </thead>
@@ -575,7 +629,7 @@ export default function Monthly() {
                   const s = rowStyle(m);
                   const isCurrent = m.month === currentMonth;
                   return (
-                    <tr key={m.id} className={`transition-colors border-b border-gray-100 ${s.row} group`}>
+                    <tr key={m.id} className={`transition-colors border-b border-gray-100 ${s.row} group cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
                       <td className={`sticky left-0 z-10 px-2 py-1.5 font-bold whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] border-r border-gray-100 ${s.sticky}`}>
                         <div className="flex items-center gap-2">
                           {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse flex-shrink-0" />}
@@ -591,16 +645,18 @@ export default function Monthly() {
                         );
                       })}
                       <td className="px-1" />
-                      <td className={`${tdBase} font-bold text-sm border-l border-emerald-100 ${s.projected ? 'text-emerald-300' : 'text-emerald-600'}`}>{formatCurrency(m.calc.cashIn)}</td>
-                      {GE(m, s.projected ? 'text-gray-300' : 'text-gray-500')}
-                      <td className={`${tdBase} text-xs border-l border-red-50 ${s.projected ? 'text-gray-300' : 'text-gray-500'}`}>{formatCurrency(m.calc.gastosR)}</td>
-                      <td className={`${tdBase} text-xs ${m.calc.saldo > 0 ? (s.projected ? 'text-orange-300' : 'text-orange-500') : (s.projected ? 'text-gray-300' : 'text-gray-400')}`}>{m.calc.saldo !== 0 ? formatCurrency(m.calc.saldo) : '—'}</td>
-                      <td className={`${tdBase} text-xs ${s.projected ? 'text-violet-300' : 'text-violet-500'}`}>{formatCurrency(m.calc.savingsTotal)}</td>
-                      <td className={`${tdBase} font-bold text-sm border-l border-red-100 ${s.projected ? 'text-red-300' : 'text-red-600'}`}>{formatCurrency(m.calc.cashOut)}</td>
-                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.guardado < 0 ? 'text-red-500' : s.projected ? 'text-violet-300' : 'text-violet-600'}`}>{formatCurrency(m.calc.guardado)}</td>
-                      <td className={`${tdBase} text-xs font-semibold ${s.projected ? 'text-gray-300' : m.calc.savingsPct >= 60 ? 'text-emerald-600' : m.calc.savingsPct >= 40 ? 'text-sky-500' : m.calc.savingsPct >= 20 ? 'text-amber-500' : 'text-red-500'}`}>{formatPct(m.calc.savingsPct)}</td>
-                      <td className={`${tdBase} text-xs ${s.projected ? 'text-violet-300' : 'text-violet-500'}`}>{formatCurrency(m.ano)}</td>
-                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.totalBalance < 0 ? 'text-red-500' : s.projected ? 'text-blue-300' : 'text-blue-600'}`}>{formatCurrency(m.totalBalance)}</td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-emerald-100 text-emerald-600`}>{formatCurrency(m.calc.cashIn)}</td>
+                      {GE(m, 'text-gray-500')}
+                      <td className={`${tdBase} text-xs border-l border-red-50 text-gray-500`}>{formatCurrency(m.calc.gastosR)}</td>
+                      <td className={`${tdBase} text-xs ${m.calc.saldo > 0 ? 'text-orange-500' : 'text-gray-400'}`}>{m.calc.saldo !== 0 ? formatCurrency(m.calc.saldo) : '—'}</td>
+                      <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.calc.savingsTotal)}</td>
+                      <td className={`${tdBase} text-xs text-teal-600`}>{m.calc.savingsDeposits > 0 ? formatCurrency(m.calc.savingsDeposits) : <span className="text-gray-200">—</span>}</td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-red-100 text-red-600`}>{formatCurrency(m.calc.cashOut)}</td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.guardado < 0 ? 'text-red-500' : 'text-violet-600'}`}>{formatCurrency(m.calc.guardado)}</td>
+                      <td className={`${tdBase} text-xs font-semibold ${m.calc.savingsPct >= 60 ? 'text-emerald-600' : m.calc.savingsPct >= 40 ? 'text-sky-500' : m.calc.savingsPct >= 20 ? 'text-amber-500' : 'text-red-500'}`}>{formatPct(m.calc.savingsPct)}</td>
+                      <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.ano)}</td>
+                      <td className={`${tdBase} text-xs font-semibold ${m.totalSavingsBalance > 0 ? 'text-teal-600' : 'text-gray-300'}`}>{m.totalSavingsBalance > 0 ? formatCurrency(m.totalSavingsBalance) : '—'}</td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.totalBalance < 0 ? 'text-red-500' : 'text-blue-600'}`}>{formatCurrency(m.totalBalance)}</td>
                       <td className="px-2 py-1.5 text-center border-l border-gray-100 whitespace-nowrap cursor-pointer" onClick={() => toggleConfirmed(m)}>
                         {m.confirmed ? <CheckCircle className="w-4 h-4 text-emerald-500 mx-auto" /> : <Circle className="w-4 h-4 text-gray-200 mx-auto hover:text-gray-400 transition-colors" />}
                       </td>
@@ -621,10 +677,12 @@ export default function Monthly() {
                     <td className={`${tdBase} text-xs text-gray-300`}>{formatCurrency(totals.gastosR)}</td>
                     <td className={`${tdBase} text-xs text-orange-300`}>{formatCurrency(totals.saldo)}</td>
                     <td className={`${tdBase} text-xs text-violet-300`}>{formatCurrency(totals.savingsTotal)}</td>
+                    <td className={`${tdBase} text-xs text-teal-300`}>{formatCurrency(totals.savingsDeposits)}</td>
                     <td className={`${tdBase} text-sm text-red-300 border-l border-gray-700`}>{formatCurrency(totals.cashOut)}</td>
                     <td className={`${tdBase} text-sm text-violet-300 border-l border-gray-700`}>{formatCurrency(totals.guardado)}</td>
                     <td className={`${tdBase} text-xs text-gray-300`}>{formatPct(avgSavingsPct)}</td>
                     <td className={`${tdBase} text-xs text-gray-400`}>—</td>
+                    <td className={`${tdBase} text-xs text-teal-300`}>{formatCurrency(computed[computed.length - 1]?.totalSavingsBalance ?? 0)}</td>
                     <td className={`${tdBase} text-sm text-blue-300 border-l border-gray-700`}>{formatCurrency(computed[computed.length - 1]?.totalBalance ?? 0)}</td>
                     <td className="px-2 py-1.5 text-center text-xs text-gray-400 border-l border-gray-700">{confirmedCount}/{computed.length}</td>
                   </tr>
@@ -667,22 +725,25 @@ export default function Monthly() {
               </thead>
               <tbody>
                 {computed.map((m, idx) => {
-                  const isProjected = !m.confirmed && m.month !== currentMonth;
-                  const baseColor = isProjected ? 'text-gray-400' : 'text-emerald-700';
-                  const zeroColor = isProjected ? 'text-gray-300' : 'text-gray-300';
-                  const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30';
-                  const stickyBg = idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50';
+                  const isSelected = m.month === currentMonth;
+                  const baseColor = isSelected ? 'text-sky-700' : 'text-emerald-700';
+                  const zeroColor = 'text-gray-300';
+                  const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30');
+                  const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50');
                   return (
-                    <tr key={m.id} className={`border-b border-emerald-50 transition-colors ${rowBg} hover:bg-emerald-50/60`}>
-                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-emerald-100 ${stickyBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
-                        {MONTH_NAMES_PT[m.month - 1]}
+                    <tr key={m.id} className={`border-b border-emerald-50 transition-colors ${rowBg} hover:bg-emerald-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-emerald-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
+                        <div className="flex items-center gap-1.5">
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
+                          {MONTH_NAMES_PT[m.month - 1]}
+                        </div>
                       </td>
                       {incomeNames.map(name => {
                         const item = m.incomeItems.find(i => i.name === name);
                         const val = item?.amount ?? 0;
                         return EC(m, 'income', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-emerald-100 ${isProjected ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-emerald-100 ${isSelected ? 'text-sky-700' : 'text-emerald-700'}`}>
                         {formatCurrency(m.calc.cashIn)}
                       </td>
                     </tr>
@@ -736,22 +797,25 @@ export default function Monthly() {
               </thead>
               <tbody>
                 {computed.map((m, idx) => {
-                  const isProjected = !m.confirmed && m.month !== currentMonth;
-                  const baseColor = isProjected ? 'text-gray-400' : 'text-red-600';
-                  const zeroColor = isProjected ? 'text-gray-300' : 'text-gray-300';
-                  const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-red-50/30';
-                  const stickyBg = idx % 2 === 0 ? 'bg-white' : 'bg-red-50';
+                  const isSelected = m.month === currentMonth;
+                  const baseColor = isSelected ? 'text-sky-700' : 'text-red-600';
+                  const zeroColor = 'text-gray-300';
+                  const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-red-50/30');
+                  const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-red-50');
                   return (
-                    <tr key={m.id} className={`border-b border-red-50 transition-colors ${rowBg} hover:bg-red-50/60`}>
-                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-red-100 ${stickyBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
-                        {MONTH_NAMES_PT[m.month - 1]}
+                    <tr key={m.id} className={`border-b border-red-50 transition-colors ${rowBg} hover:bg-red-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-red-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
+                        <div className="flex items-center gap-1.5">
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
+                          {MONTH_NAMES_PT[m.month - 1]}
+                        </div>
                       </td>
                       {expenseNames.map(name => {
                         const item = m.expenseItems.find(i => i.name === name);
                         const val = item?.amount ?? 0;
                         return EC(m, 'expenses', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-red-100 ${isProjected ? 'text-red-300' : 'text-red-700'}`}>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-red-100 ${isSelected ? 'text-sky-700' : 'text-red-700'}`}>
                         {formatCurrency(m.calc.gastosR)}
                       </td>
                     </tr>
@@ -805,22 +869,25 @@ export default function Monthly() {
               </thead>
               <tbody>
                 {computed.map((m, idx) => {
-                  const isProjected = !m.confirmed && m.month !== currentMonth;
-                  const baseColor = isProjected ? 'text-gray-400' : 'text-violet-600';
-                  const zeroColor = isProjected ? 'text-gray-300' : 'text-gray-300';
-                  const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-violet-50/30';
-                  const stickyBg = idx % 2 === 0 ? 'bg-white' : 'bg-violet-50';
+                  const isSelected = m.month === currentMonth;
+                  const baseColor = isSelected ? 'text-sky-700' : 'text-violet-600';
+                  const zeroColor = 'text-gray-300';
+                  const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-violet-50/30');
+                  const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-violet-50');
                   return (
-                    <tr key={m.id} className={`border-b border-violet-50 transition-colors ${rowBg} hover:bg-violet-50/60`}>
-                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-violet-100 ${stickyBg} ${isProjected ? 'text-gray-400' : 'text-gray-700'}`}>
-                        {MONTH_NAMES_PT[m.month - 1]}
+                    <tr key={m.id} className={`border-b border-violet-50 transition-colors ${rowBg} hover:bg-violet-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-violet-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
+                        <div className="flex items-center gap-1.5">
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
+                          {MONTH_NAMES_PT[m.month - 1]}
+                        </div>
                       </td>
                       {investmentNames.map(name => {
                         const item = m.investmentItems.find(i => i.name === name);
                         const val = item?.amount ?? 0;
                         return EC(m, 'investments', name, item, val > 0 ? baseColor : zeroColor);
                       })}
-                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-violet-100 ${isProjected ? 'text-violet-300' : 'text-violet-700'}`}>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-violet-100 ${isSelected ? 'text-sky-700' : 'text-violet-700'}`}>
                         {formatCurrency(m.calc.savingsTotal)}
                       </td>
                     </tr>
@@ -843,6 +910,88 @@ export default function Monthly() {
             </table>
           </div>
         </div>
+        {/* ═══════════════════════════════════════════════════════════════════
+            SAVINGS ACCOUNTS BREAKDOWN TABLE
+        ═══════════════════════════════════════════════════════════════════ */}
+        <TableHeader title="Savings Accounts" color="teal"
+          adding={addingCol === 'savings'} addValue={newColName}
+          onAddChange={setNewColName} onAddStart={() => setAddingCol('savings')}
+          onAddConfirm={() => addColumn('savings')}
+          onAddCancel={() => { setAddingCol(null); setNewColName(''); }}
+        />
+        <div className="bg-white rounded-2xl shadow-sm border border-teal-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-teal-600 text-white">
+                  <th className="sticky left-0 z-10 bg-teal-600 px-1 py-1 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-teal-500">MONTH</th>
+                  <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd('savings', savingsAccountNames)}>
+                    <SortableContext items={savingsAccountNames} strategy={horizontalListSortingStrategy}>
+                      {savingsAccountNames.map(name => (
+                        <SortableColHead key={name} id={name} name={name}
+                          onDelete={() => deleteColumn('savings', name)}
+                          onRename={newName => renameColumn('savings', name, newName)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                  <th className="bg-teal-700 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-teal-500">DEPOSITED</th>
+                  <th className="bg-teal-800 px-1 py-0.5 text-right text-[10px] font-bold whitespace-nowrap border-l border-teal-600">BALANCE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {computed.map((m, idx) => {
+                  const isSelected = m.month === currentMonth;
+                  const baseColor = isSelected ? 'text-sky-700' : 'text-teal-700';
+                  const zeroColor = 'text-gray-300';
+                  const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-teal-50/30');
+                  const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-teal-50');
+                  return (
+                    <tr key={m.id} className={`border-b border-teal-50 transition-colors ${rowBg} hover:bg-teal-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                      <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-teal-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
+                        <div className="flex items-center gap-1.5">
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
+                          {MONTH_NAMES_PT[m.month - 1]}
+                        </div>
+                      </td>
+                      {savingsAccountNames.map(name => {
+                        const item = m.savingsItems.find(i => i.name === name);
+                        const val = item?.amount ?? 0;
+                        return EC(m, 'savings', name, item, val > 0 ? baseColor : zeroColor);
+                      })}
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-teal-100 ${isSelected ? 'text-sky-700' : 'text-teal-700'}`}>
+                        {m.calc.savingsDeposits > 0 ? formatCurrency(m.calc.savingsDeposits) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className={`px-1 py-0.5 text-right tabular-nums text-[10px] font-bold whitespace-nowrap border-l border-teal-200 ${isSelected ? 'text-sky-700' : 'text-teal-800'}`}>
+                        {formatCurrency(m.totalSavingsBalance)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-teal-700 text-white font-bold border-t-2 border-teal-400">
+                  <td className="sticky left-0 z-10 bg-teal-700 px-1 py-1 text-xs uppercase tracking-wider border-r border-teal-500">TOTAL</td>
+                  {savingsAccountNames.map(name => (
+                    <td key={name} className="px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap text-teal-100">
+                      {formatCurrency(savingsAccountTotals[name] ?? 0)}
+                    </td>
+                  ))}
+                  <td className="bg-teal-700 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-teal-500">
+                    {formatCurrency(totals.savingsDeposits)}
+                  </td>
+                  <td className="bg-teal-800 px-1 py-0.5 text-right tabular-nums text-[10px] whitespace-nowrap border-l border-teal-600">
+                    {formatCurrency(computed[computed.length - 1]?.totalSavingsBalance ?? 0)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        {savingsAccountNames.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-2">No savings accounts yet — use "add column +" above to add one</p>
+        )}
+
         </div>{/* end breakdown tables */}
 
       {activeNote && (

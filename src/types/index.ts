@@ -26,6 +26,7 @@ export interface AppState {
   income: LineItem[];
   expenses: LineItem[];
   investments: LineItem[];
+  savings: LineItem[];
   yearConfigs: YearConfig[];
 }
 
@@ -35,6 +36,7 @@ export interface MonthCalculations {
   gastosEx: number;
   saldo: number;
   savingsTotal: number;
+  savingsDeposits: number;
   cashOut: number;
   guardado: number;
   savingsPct: number;
@@ -46,8 +48,10 @@ export interface MonthWithCalc extends MonthMeta {
   incomeItems: LineItem[];
   expenseItems: LineItem[];
   investmentItems: LineItem[];
+  savingsItems: LineItem[];
   ano: number;
   totalBalance: number;
+  totalSavingsBalance: number;
 }
 
 export const MONTH_NAMES_PT = [

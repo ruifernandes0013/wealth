@@ -7,8 +7,8 @@ import { useAuth } from './AuthContext';
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
   | { type: 'UPDATE_MONTH_META'; payload: MonthMeta }
-  | { type: 'UPSERT_LINE_ITEM'; table: 'income' | 'expenses' | 'investments'; payload: LineItem }
-  | { type: 'DELETE_LINE_ITEM'; table: 'income' | 'expenses' | 'investments'; id: string }
+  | { type: 'UPSERT_LINE_ITEM'; table: 'income' | 'expenses' | 'investments' | 'savings'; payload: LineItem }
+  | { type: 'DELETE_LINE_ITEM'; table: 'income' | 'expenses' | 'investments' | 'savings'; id: string }
   | { type: 'UPDATE_YEAR_CONFIG'; payload: YearConfig };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -78,13 +78,18 @@ interface DataContextValue {
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   updateMonthMeta: (meta: MonthMeta) => Promise<void>;
-  upsertLineItem: (table: 'income' | 'expenses' | 'investments', item: LineItem) => Promise<void>;
-  deleteLineItem: (table: 'income' | 'expenses' | 'investments', id: string) => Promise<void>;
-  addLineItem: (table: 'income' | 'expenses' | 'investments', year: number, month: number, name: string) => Promise<void>;
+  upsertLineItem: (table: 'income' | 'expenses' | 'investments' | 'savings', item: LineItem) => Promise<void>;
+  deleteLineItem: (table: 'income' | 'expenses' | 'investments' | 'savings', id: string) => Promise<void>;
+  addLineItem: (table: 'income' | 'expenses' | 'investments' | 'savings', year: number, month: number, name: string) => Promise<void>;
   updateYearConfig: (config: YearConfig) => Promise<void>;
+  addYear: (year: number) => Promise<void>;
   getMonthsForYear: (year: number) => MonthMeta[];
   getYearConfig: (year: number) => YearConfig;
   getAvailableYears: () => number[];
+  selectedYear: number;
+  selectedMonth: number;
+  setSelectedYear: (year: number) => Promise<void>;
+  setSelectedMonth: (month: number) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -92,9 +97,14 @@ const DataContext = createContext<DataContextValue | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [state, dispatch] = useReducer(reducer, {
-    months: [], income: [], expenses: [], investments: [], yearConfigs: [],
+    months: [], income: [], expenses: [], investments: [], savings: [], yearConfigs: [],
   });
   const [loading, setLoading] = useState(true);
+
+  const _today = new Date();
+  const [selectedYear, setSelectedYearState] = useState(_today.getFullYear());
+  const [selectedMonth, setSelectedMonthState] = useState(_today.getMonth() + 1);
+  const prefRef = useRef({ year: _today.getFullYear(), month: _today.getMonth() + 1 });
 
   // Undo/redo history
   const stateRef = useRef(state);
@@ -118,7 +128,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   async function syncDiff(from: AppState, to: AppState) {
     const u = userRef.current;
     if (!u) return;
-    const lineTables = ['income', 'expenses', 'investments'] as const;
+    const lineTables = ['income', 'expenses', 'investments', 'savings'] as const;
     for (const tbl of lineTables) {
       const fromItems = from[tbl];
       const toItems = to[tbl];
@@ -197,12 +207,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     async function load() {
       setLoading(true);
-      const [monthsRes, configsRes, incomeRes, expensesRes, investmentsRes] = await Promise.all([
+      const [monthsRes, configsRes, incomeRes, expensesRes, investmentsRes, savingsRes, prefsRes] = await Promise.all([
         supabase.from('months').select('*').eq('user_id', user!.id),
         supabase.from('year_configs').select('*').eq('user_id', user!.id),
         supabase.from('income').select('*').eq('user_id', user!.id),
         supabase.from('expenses').select('*').eq('user_id', user!.id),
         supabase.from('investments').select('*').eq('user_id', user!.id),
+        supabase.from('savings').select('*').eq('user_id', user!.id),
+        supabase.from('user_preferences').select('*').eq('user_id', user!.id).maybeSingle(),
       ]);
 
       if (cancelled) return;
@@ -212,6 +224,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (incomeRes.error) console.error('[load] income error:', incomeRes.error);
       if (expensesRes.error) console.error('[load] expenses error:', expensesRes.error);
       if (investmentsRes.error) console.error('[load] investments error:', investmentsRes.error);
+      if (savingsRes.error) console.error('[load] savings error:', savingsRes.error);
 
       const months: MonthMeta[] = (monthsRes.data || []).map(rowToMonthMeta);
       const yearConfigs: YearConfig[] = (configsRes.data || []).map(r => ({
@@ -221,6 +234,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const income: LineItem[] = (incomeRes.data || []).map(rowToLineItem);
       const expenses: LineItem[] = (expensesRes.data || []).map(rowToLineItem);
       const investments: LineItem[] = (investmentsRes.data || []).map(rowToLineItem);
+      const savings: LineItem[] = (savingsRes.data || []).map(rowToLineItem);
 
       // If no data exists, seed it
       if (months.length === 0) {
@@ -268,17 +282,49 @@ export function DataProvider({ children }: { children: ReactNode }) {
             income: (iRes2.data || []).map(rowToLineItem),
             expenses: (eRes2.data || []).map(rowToLineItem),
             investments: (invRes2.data || []).map(rowToLineItem),
+            savings: [],
           },
         });
       } else {
-        dispatch({ type: 'SET_STATE', payload: { months, yearConfigs, income, expenses, investments } });
+        dispatch({ type: 'SET_STATE', payload: { months, yearConfigs, income, expenses, investments, savings } });
       }
+
+      if (prefsRes.data) {
+        const y = prefsRes.data.selected_year ?? _today.getFullYear();
+        const m = prefsRes.data.selected_month ?? _today.getMonth() + 1;
+        setSelectedYearState(y);
+        setSelectedMonthState(m);
+        prefRef.current = { year: y, month: m };
+      }
+
       setLoading(false);
     }
 
     load();
     return () => { cancelled = true; };
   }, [user]);
+
+  const setSelectedYear = async (year: number) => {
+    setSelectedYearState(year);
+    prefRef.current.year = year;
+    if (userRef.current) {
+      await supabase.from('user_preferences').upsert(
+        { user_id: userRef.current.id, selected_year: year, selected_month: prefRef.current.month },
+        { onConflict: 'user_id' }
+      );
+    }
+  };
+
+  const setSelectedMonth = async (month: number) => {
+    setSelectedMonthState(month);
+    prefRef.current.month = month;
+    if (userRef.current) {
+      await supabase.from('user_preferences').upsert(
+        { user_id: userRef.current.id, selected_year: prefRef.current.year, selected_month: month },
+        { onConflict: 'user_id' }
+      );
+    }
+  };
 
   const updateMonthMeta = async (meta: MonthMeta) => {
     if (!user) return;
@@ -295,7 +341,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (error) console.error('[updateMonthMeta] Supabase error:', error.message, error.details);
   };
 
-  const upsertLineItem = async (table: 'income' | 'expenses' | 'investments', item: LineItem) => {
+  const upsertLineItem = async (table: 'income' | 'expenses' | 'investments' | 'savings', item: LineItem) => {
     if (!user) return;
     pushHistory();
     dispatch({ type: 'UPSERT_LINE_ITEM', table, payload: item });
@@ -312,7 +358,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (error) console.error(`[upsertLineItem:${table}] Supabase error:`, error.message, error.details);
   };
 
-  const deleteLineItem = async (table: 'income' | 'expenses' | 'investments', id: string) => {
+  const deleteLineItem = async (table: 'income' | 'expenses' | 'investments' | 'savings', id: string) => {
     if (!user) return;
     pushHistory();
     dispatch({ type: 'DELETE_LINE_ITEM', table, id });
@@ -321,7 +367,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const addLineItem = async (
-    table: 'income' | 'expenses' | 'investments',
+    table: 'income' | 'expenses' | 'investments' | 'savings',
     year: number,
     month: number,
     name: string
@@ -347,6 +393,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
     (data || []).forEach(row => {
       dispatch({ type: 'UPSERT_LINE_ITEM', table, payload: rowToLineItem(row) });
     });
+  };
+
+  const addYear = async (year: number) => {
+    if (!user) return;
+    if (state.months.some(m => m.year === year)) return;
+    pushHistory();
+    const newMonths: MonthMeta[] = Array.from({ length: 12 }, (_, i) => ({
+      id: `${year}-${String(i + 1).padStart(2, '0')}`,
+      year,
+      month: i + 1,
+      confirmed: false,
+      gastosExOverride: null,
+    }));
+    const [mRes, cRes] = await Promise.all([
+      supabase.from('months').upsert(
+        newMonths.map(m => ({ id: m.id, user_id: user.id, year: m.year, month: m.month, confirmed: m.confirmed, gastos_ex_override: null })),
+        { onConflict: 'id' }
+      ),
+      supabase.from('year_configs').upsert(
+        { user_id: user.id, year, initial_balance: 0 },
+        { onConflict: 'user_id,year' }
+      ),
+    ]);
+    if (mRes.error) console.error('[addYear] months error:', mRes.error);
+    if (cRes.error) console.error('[addYear] year_configs error:', cRes.error);
+    newMonths.forEach(m => dispatch({ type: 'UPDATE_MONTH_META', payload: m }));
+    dispatch({ type: 'UPDATE_YEAR_CONFIG', payload: { year, initialBalance: 0 } });
   };
 
   const updateYearConfig = async (config: YearConfig) => {
@@ -378,7 +451,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       state, loading,
       canUndo, canRedo, undo, redo,
       updateMonthMeta, upsertLineItem, deleteLineItem, addLineItem,
-      updateYearConfig, getMonthsForYear, getYearConfig, getAvailableYears,
+      updateYearConfig, addYear, getMonthsForYear, getYearConfig, getAvailableYears,
+      selectedYear, selectedMonth, setSelectedYear, setSelectedMonth,
     }}>
       {children}
     </DataContext.Provider>
