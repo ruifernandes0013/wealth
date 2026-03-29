@@ -226,10 +226,12 @@ export default function Monthly() {
     state, loading,
     upsertLineItem, addLineItem, deleteLineItem, updateMonthMeta, updateYearConfig, addYear,
     getMonthsForYear, getYearConfig, getAvailableYears,
-    selectedYear, selectedMonth, setSelectedYear, setSelectedMonth,
+    selectedYear, setSelectedYear,
   } = useData();
 
   const availableYears = getAvailableYears();
+  const today = new Date();
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
   const [balanceInput, setBalanceInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
   const [activeNote, setActiveNote] = useState<ActiveNote | null>(null);
@@ -242,9 +244,6 @@ export default function Monthly() {
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
   const computed = calcYearMonths(months, state.income, state.expenses, state.investments, state.savings, yearConfig.initialBalance, state.savings);
-
-  const today = new Date();
-  const currentMonth = selectedMonth;
 
   // Dynamic column names sorted by sortOrder
   const incomeNames = getUniqueNames(state.income, selectedYear);
@@ -554,7 +553,7 @@ export default function Monthly() {
             <YearSelector
               selectedYear={selectedYear}
               availableYears={availableYears}
-              onSelectYear={y => { void setSelectedYear(y); void setSelectedMonth(today.getMonth() + 1); }}
+              onSelectYear={y => { void setSelectedYear(y); setCurrentMonth(today.getMonth() + 1); }}
               onCreateYear={addYear}
             />
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
@@ -629,7 +628,7 @@ export default function Monthly() {
                   const s = rowStyle(m);
                   const isCurrent = m.month === currentMonth;
                   return (
-                    <tr key={m.id} className={`transition-colors border-b border-gray-100 ${s.row} group cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                    <tr key={m.id} className={`transition-colors border-b border-gray-100 ${s.row} group cursor-pointer`} onClick={() => setCurrentMonth(m.month)}>
                       <td className={`sticky left-0 z-10 px-2 py-1.5 font-bold whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] border-r border-gray-100 ${s.sticky}`}>
                         <div className="flex items-center gap-2">
                           {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse flex-shrink-0" />}
@@ -731,7 +730,7 @@ export default function Monthly() {
                   const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30');
                   const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50');
                   return (
-                    <tr key={m.id} className={`border-b border-emerald-50 transition-colors ${rowBg} hover:bg-emerald-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                    <tr key={m.id} className={`border-b border-emerald-50 transition-colors ${rowBg} hover:bg-emerald-50/60 cursor-pointer`} onClick={() => setCurrentMonth(m.month)}>
                       <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-emerald-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
                         <div className="flex items-center gap-1.5">
                           {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
@@ -803,7 +802,7 @@ export default function Monthly() {
                   const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-red-50/30');
                   const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-red-50');
                   return (
-                    <tr key={m.id} className={`border-b border-red-50 transition-colors ${rowBg} hover:bg-red-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                    <tr key={m.id} className={`border-b border-red-50 transition-colors ${rowBg} hover:bg-red-50/60 cursor-pointer`} onClick={() => setCurrentMonth(m.month)}>
                       <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-red-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
                         <div className="flex items-center gap-1.5">
                           {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
@@ -875,7 +874,7 @@ export default function Monthly() {
                   const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-violet-50/30');
                   const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-violet-50');
                   return (
-                    <tr key={m.id} className={`border-b border-violet-50 transition-colors ${rowBg} hover:bg-violet-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                    <tr key={m.id} className={`border-b border-violet-50 transition-colors ${rowBg} hover:bg-violet-50/60 cursor-pointer`} onClick={() => setCurrentMonth(m.month)}>
                       <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-violet-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
                         <div className="flex items-center gap-1.5">
                           {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
@@ -947,7 +946,7 @@ export default function Monthly() {
                   const rowBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-teal-50/30');
                   const stickyBg = isSelected ? 'bg-sky-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-teal-50');
                   return (
-                    <tr key={m.id} className={`border-b border-teal-50 transition-colors ${rowBg} hover:bg-teal-50/60 cursor-pointer`} onClick={() => void setSelectedMonth(m.month)}>
+                    <tr key={m.id} className={`border-b border-teal-50 transition-colors ${rowBg} hover:bg-teal-50/60 cursor-pointer`} onClick={() => setCurrentMonth(m.month)}>
                       <td className={`sticky left-0 z-10 px-1 py-1 font-semibold text-xs whitespace-nowrap border-r border-teal-100 ${stickyBg} ${isSelected ? 'text-sky-700' : 'text-gray-700'}`}>
                         <div className="flex items-center gap-1.5">
                           {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0" />}
