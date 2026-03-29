@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, Loader2, Circle, MessageSquare, Plus, Clipboard, X } from 'lucide-react';
 import YearSelector from '../components/YearSelector';
+import MonthSelector from '../components/MonthSelector';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -226,12 +227,12 @@ export default function Monthly() {
     state, loading,
     upsertLineItem, addLineItem, deleteLineItem, updateMonthMeta, updateYearConfig, addYear,
     getMonthsForYear, getYearConfig, getAvailableYears,
-    selectedYear, setSelectedYear,
+    selectedYear, setSelectedYear, selectedMonth, setSelectedMonth,
   } = useData();
 
   const availableYears = getAvailableYears();
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
+  const currentMonth = selectedMonth;
+  const setCurrentMonth = (month: number) => { void setSelectedMonth(month); };
   const [balanceInput, setBalanceInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
   const [activeNote, setActiveNote] = useState<ActiveNote | null>(null);
@@ -553,8 +554,17 @@ export default function Monthly() {
             <YearSelector
               selectedYear={selectedYear}
               availableYears={availableYears}
-              onSelectYear={y => { void setSelectedYear(y); setCurrentMonth(today.getMonth() + 1); }}
+              onSelectYear={y => { void setSelectedYear(y); }}
               onCreateYear={addYear}
+            />
+            <MonthSelector
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              availableYears={availableYears}
+              onChange={(year, month) => {
+                if (year !== selectedYear) void setSelectedYear(year);
+                void setSelectedMonth(month);
+              }}
             />
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
               <span className="text-xs text-gray-400">Opening balance:</span>
