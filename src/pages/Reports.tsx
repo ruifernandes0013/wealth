@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import YearSelector from '../components/YearSelector';
 import {
   BarChart,
   Bar,
@@ -27,7 +28,6 @@ import {
   Landmark,
   Star,
   Percent,
-  ChevronDown,
   CheckCircle,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
@@ -239,9 +239,8 @@ const MONTH_NAMES_FULL = MONTH_NAMES_FULL_PT;
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, loading, selectedYear, setSelectedYear } = useData();
   const availableYears = getAvailableYears();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [fromMonth, setFromMonth] = useState(1);
   const [toMonth, setToMonth] = useState(12);
 
@@ -454,20 +453,12 @@ export default function Reports() {
         {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Year selector */}
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
-            >
-              {availableYears.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <YearSelector
+            selectedYear={selectedYear}
+            availableYears={availableYears}
+            onSelectYear={y => void setSelectedYear(y)}
+            onCreateYear={async () => {}}
+          />
           {/* From month */}
           <div className="flex items-center gap-1.5">
             <span className="text-sm text-gray-500">From:</span>
@@ -694,25 +685,6 @@ export default function Reports() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Monthly Savings Amount ────────────────────────────────────────── */}
-      <SectionHeader title="Monthly Savings (Guardado)" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={monthlyChartData} barSize={22} barCategoryGap="30%">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v/1000).toFixed(1)}k`} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <ReferenceLine y={0} stroke="#e5e7eb" strokeWidth={2} />
-            <Bar dataKey="Saved" radius={[4, 4, 0, 0]}>
-              {monthlyChartData.map((entry, i) => (
-                <Cell key={i} fill={(entry['Saved'] as number) >= 0 ? '#8b5cf6' : '#ef4444'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
       {/* ── Extraordinary Over Time ───────────────────────────────────────── */}
       <SectionHeader title="Extraordinary Over Time" />
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -745,25 +717,6 @@ export default function Reports() {
             {incomeNames.map((name, i, arr) => (
               <Bar key={name} dataKey={name} stackId="a"
                 fill={INCOME_COLORS[i % INCOME_COLORS.length]}
-                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Expense Breakdown Stacked Bar ───────────────────────────────── */}
-      <SectionHeader title="Expense Breakdown by Month" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={expenseBreakdownData} barSize={32} barCategoryGap="25%">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {expenseNames.map((name, i, arr) => (
-              <Bar key={name} dataKey={name} stackId="b"
-                fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]}
                 radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
             ))}
           </BarChart>

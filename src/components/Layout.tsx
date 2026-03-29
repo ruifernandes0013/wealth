@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useEffect } from 'react';
-import { TrendingUp, Table2, BarChart3, LogOut, Undo2, Redo2 } from 'lucide-react';
+import { TrendingUp, Table2, BarChart3, GitCompare, LogOut, Undo2, Redo2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -82,6 +82,9 @@ export default function Layout() {
               <NavLink to="/reports" className={topNavClass}>
                 <BarChart3 className="w-4 h-4" /> Reports
               </NavLink>
+              <NavLink to="/compare" className={topNavClass}>
+                <GitCompare className="w-4 h-4" /> Compare
+              </NavLink>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -124,7 +127,7 @@ export default function Layout() {
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-3">
           <NavLink to="/monthly">
             {({ isActive }) => (
               <div className={`flex flex-col items-center justify-center gap-1 h-16 transition-colors ${
@@ -142,6 +145,14 @@ export default function Layout() {
               }`}>
                 <BarChart3 className="w-5 h-5" />
                 <span className="text-xs font-semibold">Reports</span>
+              </div>
+            )}
+          </NavLink>
+          <NavLink to="/compare">
+            {({ isActive }) => (
+              <div className={`flex flex-col items-center justify-center gap-1 h-16 transition-colors ${isActive ? 'text-violet-600' : 'text-gray-400'}`}>
+                <GitCompare className="w-5 h-5" />
+                <span className="text-xs font-semibold">Compare</span>
               </div>
             )}
           </NavLink>

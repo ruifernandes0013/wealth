@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -24,9 +23,8 @@ import YearSelector from '../components/YearSelector';
 import { MONTH_NAMES_PT } from '../types';
 
 export default function Dashboard() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear, selectedYear, setSelectedYear } = useData();
   const availableYears = getAvailableYears();
-  const [selectedYear, setSelectedYear] = useState(availableYears[0] ?? 2026);
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);

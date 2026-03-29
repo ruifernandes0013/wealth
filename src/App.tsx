@@ -4,6 +4,7 @@ import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import Monthly from './pages/Monthly';
 import Reports from './pages/Reports';
+import Compare from './pages/Compare';
 import Login from './pages/Login';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/monthly" replace />} />
         <Route path="monthly" element={<Monthly />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="compare" element={<Compare />} />
         <Route path="*" element={<Navigate to="/monthly" replace />} />
       </Route>
     </Routes>
