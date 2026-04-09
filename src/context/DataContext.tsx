@@ -413,7 +413,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addYear = async (year: number) => {
     if (!user) return;
-    if (state.months.some(m => m.year === year)) return;
+    const hasMonths = state.months.some(m => m.year === year);
+    const hasLineItems = (['income', 'expenses', 'investments', 'savings'] as const).some(
+      tbl => state[tbl].some(i => i.year === year)
+    );
+    if (hasMonths && hasLineItems) return;
     pushHistory();
     const newMonths: MonthMeta[] = Array.from({ length: 12 }, (_, i) => ({
       id: `${year}-${String(i + 1).padStart(2, '0')}`,
@@ -422,23 +426,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
       confirmed: false,
       gastosExOverride: null,
     }));
-    const [mRes, cRes] = await Promise.all([
-      supabase.from('months').upsert(
-        newMonths.map(m => ({ id: m.id, user_id: user.id, year: m.year, month: m.month, confirmed: m.confirmed, gastos_ex_override: null })),
-        { onConflict: 'id' }
-      ),
-      supabase.from('year_configs').upsert(
-        { user_id: user.id, year, initial_balance: 0 },
-        { onConflict: 'user_id,year' }
-      ),
-    ]);
-    if (mRes.error) console.error('[addYear] months error:', mRes.error);
-    if (cRes.error) console.error('[addYear] year_configs error:', cRes.error);
-    newMonths.forEach(m => dispatch({ type: 'UPDATE_MONTH_META', payload: m }));
-    dispatch({ type: 'UPDATE_YEAR_CONFIG', payload: { year, initialBalance: 0 } });
+    if (!hasMonths) {
+      const [mRes, cRes] = await Promise.all([
+        supabase.from('months').upsert(
+          newMonths.map(m => ({ id: m.id, user_id: user.id, year: m.year, month: m.month, confirmed: m.confirmed, gastos_ex_override: null })),
+          { onConflict: 'id' }
+        ),
+        supabase.from('year_configs').upsert(
+          { user_id: user.id, year, initial_balance: 0 },
+          { onConflict: 'user_id,year' }
+        ),
+      ]);
+      if (mRes.error) console.error('[addYear] months error:', mRes.error);
+      if (cRes.error) console.error('[addYear] year_configs error:', cRes.error);
+      newMonths.forEach(m => dispatch({ type: 'UPDATE_MONTH_META', payload: m }));
+      dispatch({ type: 'UPDATE_YEAR_CONFIG', payload: { year, initialBalance: 0 } });
+    }
 
     // Copy line item structure from nearest previous year (or any available year)
-    const existingYears = Array.from(new Set(stateRef.current.months.map(m => m.year))).sort((a, b) => b - a);
+    const allYears = Array.from(new Set(stateRef.current.months.map(m => m.year))).sort((a, b) => b - a);
+    const existingYears = allYears.filter(y => y !== year);
     const sourceYear = existingYears.find(y => y < year) ?? existingYears[0];
     if (sourceYear == null) return;
     const lineTables = ['income', 'expenses', 'investments', 'savings'] as const;
