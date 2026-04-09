@@ -104,7 +104,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const _today = new Date();
   const [selectedYear, setSelectedYearState] = useState(_today.getFullYear());
   const [selectedMonth, setSelectedMonthState] = useState(_today.getMonth() + 1);
-  const prefRef = useRef({ year: _today.getFullYear(), month: _today.getMonth() + 1 });
+  // Map of year → selected_month loaded from DB
+  const yearPrefsRef = useRef<Map<number, number>>(new Map());
+  const selectedYearRef = useRef(_today.getFullYear());
+  const selectedMonthRef = useRef(_today.getMonth() + 1);
 
   // Undo/redo history
   const stateRef = useRef(state);
@@ -214,7 +217,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         supabase.from('expenses').select('*').eq('user_id', user!.id),
         supabase.from('investments').select('*').eq('user_id', user!.id),
         supabase.from('savings').select('*').eq('user_id', user!.id),
-        supabase.from('user_preferences').select('*').eq('user_id', user!.id).maybeSingle(),
+        supabase.from('user_preferences').select('*').eq('user_id', user!.id),
       ]);
 
       if (cancelled) return;
@@ -289,12 +292,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_STATE', payload: { months, yearConfigs, income, expenses, investments, savings } });
       }
 
-      if (prefsRes.data) {
-        const y = prefsRes.data.selected_year ?? _today.getFullYear();
-        const m = prefsRes.data.selected_month ?? _today.getMonth() + 1;
+      if (prefsRes.data && prefsRes.data.length > 0) {
+        const map = new Map<number, number>();
+        for (const row of prefsRes.data) {
+          map.set(row.year as number, row.selected_month as number);
+        }
+        yearPrefsRef.current = map;
+        // Always default to current year, restore saved month for that year
+        const y = _today.getFullYear();
+        const m = map.get(y) ?? _today.getMonth() + 1;
         setSelectedYearState(y);
+        selectedYearRef.current = y;
         setSelectedMonthState(m);
-        prefRef.current = { year: y, month: m };
       }
 
       setLoading(false);
@@ -306,22 +315,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const setSelectedYear = async (year: number) => {
     setSelectedYearState(year);
-    prefRef.current.year = year;
+    selectedYearRef.current = year;
+    // Restore saved month for this year, or fall back to current selectedMonth
+    const savedMonth = yearPrefsRef.current.get(year);
+    const restoredMonth = savedMonth ?? selectedMonthRef.current;
+    setSelectedMonthState(restoredMonth);
+    selectedMonthRef.current = restoredMonth;
     if (userRef.current) {
       await supabase.from('user_preferences').upsert(
-        { user_id: userRef.current.id, selected_year: year, selected_month: prefRef.current.month },
-        { onConflict: 'user_id' }
+        { user_id: userRef.current.id, year, selected_month: restoredMonth },
+        { onConflict: 'user_id,year' }
       );
     }
   };
 
   const setSelectedMonth = async (month: number) => {
     setSelectedMonthState(month);
-    prefRef.current.month = month;
+    selectedMonthRef.current = month;
+    const year = selectedYearRef.current;
+    yearPrefsRef.current.set(year, month);
     if (userRef.current) {
       await supabase.from('user_preferences').upsert(
-        { user_id: userRef.current.id, selected_year: prefRef.current.year, selected_month: month },
-        { onConflict: 'user_id' }
+        { user_id: userRef.current.id, year, selected_month: month },
+        { onConflict: 'user_id,year' }
       );
     }
   };
@@ -420,6 +436,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (cRes.error) console.error('[addYear] year_configs error:', cRes.error);
     newMonths.forEach(m => dispatch({ type: 'UPDATE_MONTH_META', payload: m }));
     dispatch({ type: 'UPDATE_YEAR_CONFIG', payload: { year, initialBalance: 0 } });
+
+    // Copy line item structure from nearest previous year (or any available year)
+    const existingYears = Array.from(new Set(stateRef.current.months.map(m => m.year))).sort((a, b) => b - a);
+    const sourceYear = existingYears.find(y => y < year) ?? existingYears[0];
+    if (sourceYear == null) return;
+    const lineTables = ['income', 'expenses', 'investments', 'savings'] as const;
+    for (const tbl of lineTables) {
+      const uniqueNames = [...new Set(stateRef.current[tbl].filter(i => i.year === sourceYear).map(i => i.name))];
+      if (uniqueNames.length === 0) continue;
+      const rows = newMonths.flatMap(m =>
+        uniqueNames.map((name, idx) => ({
+          user_id: user.id,
+          year: m.year,
+          month: m.month,
+          name,
+          amount: 0,
+          sort_order: idx,
+        }))
+      );
+      const { data, error } = await supabase.from(tbl).upsert(rows, { onConflict: 'user_id,year,month,name' }).select('*');
+      if (error) {
+        console.error(`[addYear:${tbl}] Supabase error:`, error.message, error.details);
+        continue;
+      }
+      (data || []).forEach(row => {
+        dispatch({ type: 'UPSERT_LINE_ITEM', table: tbl, payload: rowToLineItem(row) });
+      });
+    }
   };
 
   const updateYearConfig = async (config: YearConfig) => {
