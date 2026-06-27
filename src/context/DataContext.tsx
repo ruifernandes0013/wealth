@@ -90,6 +90,7 @@ interface DataContextValue {
   selectedMonth: number;
   setSelectedYear: (year: number) => Promise<void>;
   setSelectedMonth: (month: number) => Promise<void>;
+  reload: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -100,6 +101,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     months: [], income: [], expenses: [], investments: [], savings: [], yearConfigs: [],
   });
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey(k => k + 1);
 
   const _today = new Date();
   const [selectedYear, setSelectedYearState] = useState(_today.getFullYear());
@@ -311,7 +314,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     load();
     return () => { cancelled = true; };
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, reloadKey]);
 
   const setSelectedYear = async (year: number) => {
     setSelectedYearState(year);
@@ -503,7 +507,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       canUndo, canRedo, undo, redo,
       updateMonthMeta, upsertLineItem, deleteLineItem, addLineItem,
       updateYearConfig, addYear, getMonthsForYear, getYearConfig, getAvailableYears,
-      selectedYear, selectedMonth, setSelectedYear, setSelectedMonth,
+      selectedYear, selectedMonth, setSelectedYear, setSelectedMonth, reload,
     }}>
       {children}
     </DataContext.Provider>

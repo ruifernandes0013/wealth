@@ -1,12 +1,12 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useEffect } from 'react';
-import { TrendingUp, Table2, BarChart3, GitCompare, LogOut, Undo2, Redo2 } from 'lucide-react';
+import { TrendingUp, Table2, BarChart3, GitCompare, LogOut, Undo2, Redo2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
 export default function Layout() {
   const { user, signOut } = useAuth();
-  const { canUndo, canRedo, undo, redo } = useData();
+  const { canUndo, canRedo, undo, redo, reload } = useData();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -39,6 +39,13 @@ export default function Layout() {
             <span className="font-bold text-gray-900 text-base">Wealth</span>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={reload}
+              title="Reload data"
+              className="p-2 rounded-lg transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
             <button
               onClick={undo}
               disabled={!canUndo}
@@ -87,6 +94,13 @@ export default function Layout() {
               </NavLink>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={reload}
+                title="Reload data"
+                className="p-2 rounded-lg transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
               <button
                 onClick={undo}
                 disabled={!canUndo}

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   BarChart,
   Bar,
-  LineChart,
   Line,
   AreaChart,
   Area,
@@ -18,7 +17,6 @@ import {
   RadialBarChart,
   RadialBar,
   PolarAngleAxis,
-  ReferenceLine,
 } from 'recharts';
 import {
   TrendingUp,
@@ -82,20 +80,6 @@ function CurrencyTooltip({ active, payload, label }: CustomTooltipProps) {
       {payload.map((p) => (
         <p key={p.name} style={{ color: p.color }}>
           {p.name}: <strong>{formatCurrency(p.value)}</strong>
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function PctTooltip({ active, payload, label }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg text-sm">
-      {label && <p className="font-semibold text-gray-700 mb-1">{label}</p>}
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name}: <strong>{formatPct(p.value)}</strong>
         </p>
       ))}
     </div>
@@ -363,11 +347,6 @@ export default function Reports() {
     Saved: m.calc.guardado,
   }));
 
-  const savingsRateData = computed.map((m) => ({
-    name: MONTH_NAMES_PT[m.month - 1],
-    'Savings Rate': m.calc.savingsPct,
-  }));
-
   const balanceData = computed.map((m) => ({
     name: MONTH_NAMES_PT[m.month - 1],
     'Bank Balance': m.totalBalance,
@@ -424,16 +403,6 @@ export default function Reports() {
     return { name: MONTH_NAMES_PT[m.month - 1], 'Income': cumIncome, 'Expenses': cumExpenses, 'Net': cumNet };
   });
 
-  // Month-over-month delta for savings rate
-  const momDeltas = computed.map((m, i) => ({
-    name: MONTH_NAMES_PT[m.month - 1],
-    rate: m.calc.savingsPct,
-    delta: i > 0 ? m.calc.savingsPct - computed[i - 1].calc.savingsPct : 0,
-    guardado: m.calc.guardado,
-    cashIn: m.calc.cashIn,
-    confirmed: m.confirmed,
-  }));
-
   // ── Extraordinary metrics ────────────────────────────────────────────────
   const totalExtraordinary = computed.reduce((s, m) => s + m.calc.savingsTotal, 0);
   const extraordinaryPctOfIncome = totalIncome > 0 ? (totalExtraordinary / totalIncome) * 100 : 0;
@@ -464,7 +433,8 @@ export default function Reports() {
   const confirmedMonths = computed.filter((m) => m.confirmed);
 
   // ── Year comparison data ─────────────────────────────────────────────────
-  const yearTotals = availableYears.map((year, yi) => {
+  const sortedYears = [...availableYears].sort((a, b) => a - b);
+  const yearTotals = sortedYears.map((year, yi) => {
     const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
     const yIncome = yData.reduce((s, m) => s + m.calc.cashIn, 0);
     const yExpenses = yData.reduce((s, m) => s + m.calc.gastosEx, 0);
@@ -478,19 +448,9 @@ export default function Reports() {
   // Month-by-month comparison across years (income)
   const monthlyIncomeByYear = MONTH_NAMES_PT.map((name, i) => {
     const entry: Record<string, string | number> = { name };
-    availableYears.forEach(year => {
+    sortedYears.forEach(year => {
       const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
       entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.cashIn ?? 0;
-    });
-    return entry;
-  });
-
-  // Month-by-month savings rate comparison
-  const monthlySavingsRateByYear = MONTH_NAMES_PT.map((name, i) => {
-    const entry: Record<string, string | number> = { name };
-    availableYears.forEach(year => {
-      const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
-      entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.savingsPct ?? 0;
     });
     return entry;
   });
@@ -498,7 +458,7 @@ export default function Reports() {
   // Month-by-month expenses comparison
   const monthlyExpensesByYear = MONTH_NAMES_PT.map((name, i) => {
     const entry: Record<string, string | number> = { name };
-    availableYears.forEach(year => {
+    sortedYears.forEach(year => {
       const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
       entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.gastosEx ?? 0;
     });
@@ -508,7 +468,7 @@ export default function Reports() {
   // Month-by-month savings (guardado) comparison
   const monthlySavedByYear = MONTH_NAMES_PT.map((name, i) => {
     const entry: Record<string, string | number> = { name };
-    availableYears.forEach(year => {
+    sortedYears.forEach(year => {
       const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
       entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.guardado ?? 0;
     });
@@ -795,101 +755,6 @@ export default function Reports() {
       </div>
 
 
-      {/* ── Savings Rate Line ────────────────────────────────────────────── */}
-      <SectionHeader title="Savings Rate by Month" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={savingsRateData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={[0, 100]} />
-            <Tooltip content={<PctTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Line
-              type="monotone"
-              dataKey="Savings Rate"
-              stroke="#8b5cf6"
-              strokeWidth={2.5}
-              dot={{ r: 4, fill: '#8b5cf6' }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Financial Health Ratios ───────────────────────────────────────── */}
-      <SectionHeader title="Financial Health Ratios" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Emergency Runway */}
-        {(() => {
-          const months = Math.max(0, runway);
-          const color = months >= 12 ? '#10b981' : months >= 6 ? '#f59e0b' : '#ef4444';
-          const label = months >= 12 ? 'Excellent' : months >= 6 ? 'Adequate' : 'Low';
-          const pct = Math.min((months / 24) * 100, 100);
-          return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Emergency Runway</p>
-              <p className="text-3xl font-black tabular-nums" style={{ color }}>{months.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-1">mo</span></p>
-              <p className="text-xs text-gray-400 mt-0.5">Bank balance ÷ avg monthly expenses</p>
-              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(lastBalance)} ÷ {formatCurrency(avgMonthlyExpenses)}/mo</p>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
-              </div>
-              <p className="text-xs font-medium mt-1.5" style={{ color }}>{label} · target ≥ 12 months</p>
-            </div>
-          );
-        })()}
-        {/* Expense Ratio */}
-        {(() => {
-          const color = expenseRatio <= 40 ? '#10b981' : expenseRatio <= 60 ? '#f59e0b' : '#ef4444';
-          const label = expenseRatio <= 40 ? 'Excellent' : expenseRatio <= 60 ? 'Watch' : 'High';
-          return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Expense Ratio</p>
-              <p className="text-3xl font-black tabular-nums" style={{ color }}>{expenseRatio.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-0.5">%</span></p>
-              <p className="text-xs text-gray-400 mt-0.5">Total expenses ÷ total income</p>
-              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(totalExpenses)} ÷ {formatCurrency(totalIncome)}</p>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(expenseRatio, 100)}%`, backgroundColor: color }} />
-              </div>
-              <p className="text-xs font-medium mt-1.5" style={{ color }}>{label} · target ≤ 40%</p>
-            </div>
-          );
-        })()}
-        {/* Capital Outflow Rate */}
-        {(() => {
-          return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Capital Outflow</p>
-              <p className="text-3xl font-black tabular-nums text-violet-600">{investmentRate.toFixed(1)}<span className="text-base font-semibold text-gray-400 ml-0.5">%</span></p>
-              <p className="text-xs text-gray-400 mt-0.5">Extraordinary column ÷ total income</p>
-              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(totalInvestments)} ÷ {formatCurrency(totalIncome)}</p>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all bg-violet-400" style={{ width: `${Math.min(investmentRate * 2, 100)}%` }} />
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5">One-off, non-recurring capital events</p>
-            </div>
-          );
-        })()}
-        {/* Income Coverage Ratio */}
-        {(() => {
-          const color = coverageRatio >= 2.5 ? '#10b981' : coverageRatio >= 1.5 ? '#f59e0b' : '#ef4444';
-          const label = coverageRatio >= 2.5 ? 'Strong' : coverageRatio >= 1.5 ? 'Moderate' : 'Tight';
-          return (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Coverage Ratio</p>
-              <p className="text-3xl font-black tabular-nums" style={{ color }}>{coverageRatio.toFixed(2)}<span className="text-base font-semibold text-gray-400 ml-1">×</span></p>
-              <p className="text-xs text-gray-400 mt-0.5">Avg income ÷ avg expenses</p>
-              <p className="text-xs text-gray-300 tabular-nums mt-0.5 mb-3">{formatCurrency(avgMonthlyIncome)}/mo ÷ {formatCurrency(avgMonthlyExpenses)}/mo</p>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((coverageRatio / 3) * 100, 100)}%`, backgroundColor: color }} />
-              </div>
-              <p className="text-xs font-medium mt-1.5" style={{ color }}>{label} · target ≥ 2.5×</p>
-            </div>
-          );
-        })()}
-      </div>
-
       {/* ── Financial Goals & Action Plan ────────────────────────────────── */}
       <SectionHeader title="Financial Goals & Action Plan" />
       {computed.length > 0 && (() => {
@@ -1074,26 +939,6 @@ export default function Reports() {
             </ResponsiveContainer>
           </div>
 
-          {/* Avg savings rate by year */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Average Savings Rate by Year</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={yearTotals} barSize={48} barCategoryGap="40%">
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="year" tick={{ fontSize: 13, fill: '#6b7280', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}%`} domain={[0, 100]} />
-                <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                <ReferenceLine y={60} stroke="#10b981" strokeDasharray="4 2" label={{ value: '60%', position: 'right', fontSize: 11, fill: '#10b981' }} />
-                <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: '40%', position: 'right', fontSize: 11, fill: '#f59e0b' }} />
-                <Bar dataKey="Avg Rate" radius={[4, 4, 0, 0]}>
-                  {yearTotals.map((yt, i) => (
-                    <Cell key={i} fill={yt['Avg Rate'] >= 60 ? '#10b981' : yt['Avg Rate'] >= 40 ? '#f59e0b' : '#ef4444'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
           {/* Monthly income comparison by year */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Income — Year over Year</h3>
@@ -1104,7 +949,7 @@ export default function Reports() {
                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
                 <Tooltip content={<CurrencyTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                {availableYears.map((year, i) => (
+                {sortedYears.map((year, i) => (
                   <Bar key={year} dataKey={String(year)} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} barSize={14} />
                 ))}
               </BarChart>
@@ -1121,7 +966,7 @@ export default function Reports() {
                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
                 <Tooltip content={<CurrencyTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                {availableYears.map((year, i) => (
+                {sortedYears.map((year, i) => (
                   <Bar key={year} dataKey={String(year)} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} barSize={14} />
                 ))}
               </BarChart>
@@ -1138,39 +983,13 @@ export default function Reports() {
                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
                 <Tooltip content={<CurrencyTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                {availableYears.map((year, i) => (
+                {sortedYears.map((year, i) => (
                   <Bar key={year} dataKey={String(year)} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} barSize={14} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Monthly savings rate comparison by year */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Savings Rate — Year over Year</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={monthlySavingsRateByYear}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}%`} domain={[0, 100]} />
-                <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <ReferenceLine y={60} stroke="#10b981" strokeDasharray="4 2" />
-                <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="4 2" />
-                {availableYears.map((year, i) => (
-                  <Line
-                    key={year}
-                    type="monotone"
-                    dataKey={String(year)}
-                    stroke={YEAR_COLORS[i % YEAR_COLORS.length]}
-                    strokeWidth={2.5}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
         </>
       )}
 
@@ -1202,32 +1021,6 @@ export default function Reports() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Monthly Scorecard ─────────────────────────────────────────────── */}
-      <SectionHeader title="Monthly Scorecard" />
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {momDeltas.map((m, i) => {
-          const color = m.rate >= 60 ? { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', badge: 'bg-emerald-500' }
-            : m.rate >= 40 ? { bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-700', badge: 'bg-sky-400' }
-            : m.rate >= 20 ? { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-400' }
-            : { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', badge: 'bg-red-400' };
-          const deltaSign = m.delta > 0 ? '+' : '';
-          return (
-            <div key={i} className={`rounded-xl border p-3 ${color.bg} ${color.border} ${!m.confirmed ? 'opacity-60' : ''}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-gray-700">{m.name}</span>
-                <span className={`w-2 h-2 rounded-full ${m.confirmed ? color.badge : 'bg-gray-300'}`} />
-              </div>
-              <p className={`text-xl font-black tabular-nums ${color.text}`}>{m.rate.toFixed(0)}<span className="text-xs font-semibold">%</span></p>
-              <p className="text-xs text-gray-500 mt-0.5 tabular-nums">{formatCurrency(m.guardado)}</p>
-              {i > 0 && (
-                <p className={`text-xs font-semibold mt-1 tabular-nums ${m.delta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {deltaSign}{m.delta.toFixed(1)}pp
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

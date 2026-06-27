@@ -13,7 +13,7 @@ export function calcMonthFromItems(
   const saldo = gastosEx - gastosR;
   const savingsTotal = investmentItems.reduce((s, i) => s + i.amount, 0);
   const savingsDeposits = savingsItems.reduce((s, i) => s + i.amount, 0);
-  const cashOut = gastosEx + savingsTotal + savingsDeposits;
+  const cashOut = gastosEx;
   const guardado = cashIn - gastosEx;
   const savingsPct = cashIn > 0 ? (guardado / cashIn) * 100 : 0;
   const netBankChange = cashIn - cashOut;
