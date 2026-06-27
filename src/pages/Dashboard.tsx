@@ -20,10 +20,11 @@ import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
 import StatCard from '../components/StatCard';
 import YearSelector from '../components/YearSelector';
+import MonthSelector from '../components/MonthSelector';
 import { MONTH_NAMES_PT } from '../types';
 
 export default function Dashboard() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear, selectedYear, setSelectedYear } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear, selectedYear, setSelectedYear, selectedMonth, setSelectedMonth } = useData();
   const availableYears = getAvailableYears();
 
   const months = getMonthsForYear(selectedYear);
@@ -65,13 +66,24 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Year selector */}
-        <YearSelector
-          selectedYear={selectedYear}
-          availableYears={availableYears}
-          onSelectYear={setSelectedYear}
-          onCreateYear={addYear}
-        />
+        <div className="flex items-center gap-2">
+          <MonthSelector
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            availableYears={availableYears}
+            onChange={(year, month) => {
+              if (year !== selectedYear) void setSelectedYear(year);
+              void setSelectedMonth(month);
+            }}
+          />
+          {/* Year selector */}
+          <YearSelector
+            selectedYear={selectedYear}
+            availableYears={availableYears}
+            onSelectYear={setSelectedYear}
+            onCreateYear={addYear}
+          />
+        </div>
       </div>
 
       {/* Stat cards */}
@@ -159,6 +171,7 @@ export default function Dashboard() {
           {Array.from({ length: 12 }, (_, i) => {
             const m = computed.find((x) => x.month === i + 1);
             const isCurrent = i + 1 === currentMonth;
+            const isSelected = i + 1 === selectedMonth;
             const isConfirmed = m?.confirmed ?? false;
             const guardado = m?.calc.guardado ?? 0;
             const pct = m?.calc.savingsPct ?? 0;
@@ -166,12 +179,15 @@ export default function Dashboard() {
             return (
               <div
                 key={i}
-                className={`rounded-xl p-3 border flex flex-col gap-1 transition-all ${
-                  isCurrent
-                    ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-300'
+                onClick={() => void setSelectedMonth(i + 1)}
+                className={`rounded-xl p-3 border flex flex-col gap-1 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-violet-50 border-violet-300 ring-2 ring-violet-300'
+                    : isCurrent
+                    ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-200'
                     : isConfirmed
-                    ? 'bg-white border-gray-200'
-                    : 'bg-gray-50 border-gray-100'
+                    ? 'bg-white border-gray-200 hover:border-gray-300'
+                    : 'bg-gray-50 border-gray-100 hover:border-gray-200'
                 }`}
               >
                 <div className="flex items-center justify-between">

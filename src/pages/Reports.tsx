@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import YearSelector from '../components/YearSelector';
 import {
   BarChart,
   Bar,
@@ -238,39 +237,71 @@ const MONTH_NAMES_FULL = MONTH_NAMES_FULL_PT;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+// ─── Year comparison colors ───────────────────────────────────────────────────
+const YEAR_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
+
 export default function Reports() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears, loading, selectedYear, setSelectedYear } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
   const availableYears = getAvailableYears();
-  const [fromMonth, setFromMonth] = useState(1);
-  const [toMonth, setToMonth] = useState(12);
 
-  const months = getMonthsForYear(selectedYear);
-  const yearConfig = getYearConfig(selectedYear);
-  const allComputed = calcYearMonths(months, state.income, state.expenses, state.investments, state.savings, yearConfig.initialBalance, state.savings);
+  const _today = new Date();
+  const _currentYear = _today.getFullYear();
+  const _currentMonthYM = `${_currentYear}-${String(_today.getMonth() + 1).padStart(2, '0')}`;
+  const _currentYearFrom = `${_currentYear}-01`;
+  const _currentYearTo = `${_currentYear}-12`;
+  const [fromYM, setFromYM] = useState(_currentYearFrom);
+  const [toYM, setToYM] = useState(_currentYearTo);
 
-  // Dynamic column names sorted by sortOrder
-  function getUniqueNames(items: { year: number; name: string; sortOrder?: number }[], year: number): string[] {
+  // Detect active preset for button highlighting
+  const isCurrentMonth = fromYM === _currentMonthYM && toYM === _currentMonthYM;
+  const isCurrentYear = fromYM === _currentYearFrom && toYM === _currentYearTo;
+  const activeYear = !isCurrentMonth && !isCurrentYear
+    ? availableYears.find(y => fromYM === `${y}-01` && toYM === `${y}-12`) ?? null
+    : null;
+
+  // Compute all years
+  const allComputedByYear = availableYears.map(year => ({
+    year,
+    computed: calcYearMonths(
+      getMonthsForYear(year),
+      state.income, state.expenses, state.investments, state.savings,
+      getYearConfig(year).initialBalance, state.savings
+    ),
+  }));
+
+  // Filter by cross-year range
+  const computed = allComputedByYear.flatMap(({ year, computed: yc }) =>
+    yc.filter(m => {
+      const ym = `${year}-${String(m.month).padStart(2, '0')}`;
+      return ym >= fromYM && ym <= toYM;
+    })
+  ).sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+
+  // Also use filteredMonths alias for clarity
+  const filteredMonths = computed;
+
+  const fromYear = parseInt(fromYM.split('-')[0]);
+  const yearConfig = getYearConfig(fromYear);
+
+  // Dynamic column names from all years in filtered range
+  const yearsInRange = [...new Set(computed.map(m => m.year))];
+  function getUniqueNamesForYears(items: { year: number; name: string; sortOrder?: number }[], years: number[]): string[] {
     const map = new Map<string, number>();
-    items.filter(i => i.year === year).forEach(i => {
+    items.filter(i => years.includes(i.year)).forEach(i => {
       const cur = map.get(i.name) ?? Infinity;
       if ((i.sortOrder ?? 99) < cur) map.set(i.name, i.sortOrder ?? 99);
     });
     return Array.from(map.entries()).sort((a, b) => a[1] - b[1]).map(([n]) => n);
   }
-  const incomeNames = getUniqueNames(state.income, selectedYear);
-  const expenseNames = getUniqueNames(state.expenses, selectedYear);
-  const investmentNames = getUniqueNames(state.investments, selectedYear);
-
-  // Filter by month range
-  const computed = allComputed.filter(m => m.month >= fromMonth && m.month <= toMonth);
-
-  // Also use filteredMonths alias for clarity
-  const filteredMonths = computed;
+  const incomeNames = getUniqueNamesForYears(state.income, yearsInRange);
+  const expenseNames = getUniqueNamesForYears(state.expenses, yearsInRange);
+  const investmentNames = getUniqueNamesForYears(state.investments, yearsInRange);
 
   const handleCurrentMonth = () => {
     const now = new Date();
-    setFromMonth(now.getMonth() + 1);
-    setToMonth(now.getMonth() + 1);
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setFromYM(ym);
+    setToYM(ym);
   };
 
   if (loading) {
@@ -365,14 +396,6 @@ export default function Reports() {
     value: computed.reduce((s, m) => s + (m.investmentItems.find(i => i.name === name)?.amount ?? 0), 0),
   }));
 
-  // Income stacked bar (dynamic)
-  const propertyData = computed.map(m => {
-    const entry: Record<string, string | number> = { name: MONTH_NAMES_PT[m.month - 1] };
-    incomeNames.forEach(name => {
-      entry[name] = m.incomeItems.find(i => i.name === name)?.amount ?? 0;
-    });
-    return entry;
-  });
 
   // Expense breakdown stacked bar (dynamic)
   const expenseBreakdownData = computed.map(m => {
@@ -440,6 +463,58 @@ export default function Reports() {
   // Confirmed months table
   const confirmedMonths = computed.filter((m) => m.confirmed);
 
+  // ── Year comparison data ─────────────────────────────────────────────────
+  const yearTotals = availableYears.map((year, yi) => {
+    const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
+    const yIncome = yData.reduce((s, m) => s + m.calc.cashIn, 0);
+    const yExpenses = yData.reduce((s, m) => s + m.calc.gastosEx, 0);
+    const ySaved = yData.reduce((s, m) => s + m.calc.guardado, 0);
+    const yInvested = yData.reduce((s, m) => s + m.calc.savingsTotal, 0);
+    const yAvgRate = yData.length > 0 ? yData.reduce((s, m) => s + m.calc.savingsPct, 0) / yData.length : 0;
+    const yConfirmed = yData.filter(m => m.confirmed).length;
+    return { year: String(year), Income: yIncome, Expenses: yExpenses, Saved: ySaved, Invested: yInvested, 'Avg Rate': yAvgRate, confirmed: yConfirmed, total: yData.length, color: YEAR_COLORS[yi % YEAR_COLORS.length] };
+  });
+
+  // Month-by-month comparison across years (income)
+  const monthlyIncomeByYear = MONTH_NAMES_PT.map((name, i) => {
+    const entry: Record<string, string | number> = { name };
+    availableYears.forEach(year => {
+      const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
+      entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.cashIn ?? 0;
+    });
+    return entry;
+  });
+
+  // Month-by-month savings rate comparison
+  const monthlySavingsRateByYear = MONTH_NAMES_PT.map((name, i) => {
+    const entry: Record<string, string | number> = { name };
+    availableYears.forEach(year => {
+      const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
+      entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.savingsPct ?? 0;
+    });
+    return entry;
+  });
+
+  // Month-by-month expenses comparison
+  const monthlyExpensesByYear = MONTH_NAMES_PT.map((name, i) => {
+    const entry: Record<string, string | number> = { name };
+    availableYears.forEach(year => {
+      const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
+      entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.gastosEx ?? 0;
+    });
+    return entry;
+  });
+
+  // Month-by-month savings (guardado) comparison
+  const monthlySavedByYear = MONTH_NAMES_PT.map((name, i) => {
+    const entry: Record<string, string | number> = { name };
+    availableYears.forEach(year => {
+      const yData = allComputedByYear.find(y => y.year === year)?.computed ?? [];
+      entry[String(year)] = yData.find(m => m.month === i + 1)?.calc.guardado ?? 0;
+    });
+    return entry;
+  });
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -452,27 +527,21 @@ export default function Reports() {
         </div>
         {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Year selector */}
-          <YearSelector
-            selectedYear={selectedYear}
-            availableYears={availableYears}
-            onSelectYear={y => void setSelectedYear(y)}
-            onCreateYear={async () => {}}
-          />
           {/* From month */}
           <div className="flex items-center gap-1.5">
             <span className="text-sm text-gray-500">From:</span>
             <select
-              value={fromMonth}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                setFromMonth(v);
-                if (v > toMonth) setToMonth(v);
-              }}
+              value={fromYM}
+              onChange={(e) => { const v = e.target.value; setFromYM(v); if (v > toYM) setToYM(v); }}
               className="appearance-none bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
             >
-              {MONTH_NAMES_FULL.map((name, i) => (
-                <option key={i + 1} value={i + 1}>{name}</option>
+              {availableYears.map(year => (
+                <optgroup key={year} label={String(year)}>
+                  {MONTH_NAMES_FULL.map((name, i) => {
+                    const v = `${year}-${String(i + 1).padStart(2, '0')}`;
+                    return <option key={v} value={v}>{name} {year}</option>;
+                  })}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -480,33 +549,54 @@ export default function Reports() {
           <div className="flex items-center gap-1.5">
             <span className="text-sm text-gray-500">To:</span>
             <select
-              value={toMonth}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                setToMonth(v);
-                if (v < fromMonth) setFromMonth(v);
-              }}
+              value={toYM}
+              onChange={(e) => { const v = e.target.value; setToYM(v); if (v < fromYM) setFromYM(v); }}
               className="appearance-none bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
             >
-              {MONTH_NAMES_FULL.map((name, i) => (
-                <option key={i + 1} value={i + 1}>{name}</option>
+              {availableYears.map(year => (
+                <optgroup key={year} label={String(year)}>
+                  {MONTH_NAMES_FULL.map((name, i) => {
+                    const v = `${year}-${String(i + 1).padStart(2, '0')}`;
+                    return <option key={v} value={v}>{name} {year}</option>;
+                  })}
+                </optgroup>
               ))}
             </select>
           </div>
-          {/* Current month shortcut */}
           <button
             onClick={handleCurrentMonth}
-            className="px-3 py-2 text-sm font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg transition-colors"
+            className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              isCurrentMonth
+                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                : 'text-violet-600 bg-violet-50 hover:bg-violet-100 border-violet-200'
+            }`}
           >
             Current Month
           </button>
-          {/* Reset to full year */}
           <button
-            onClick={() => { setFromMonth(1); setToMonth(12); }}
-            className="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+            onClick={() => { setFromYM(_currentYearFrom); setToYM(_currentYearTo); }}
+            className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              isCurrentYear
+                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                : 'text-violet-600 bg-violet-50 hover:bg-violet-100 border-violet-200'
+            }`}
           >
-            Full Year
+            Current Year
           </button>
+          <select
+            value={activeYear ?? ''}
+            onChange={e => { const y = Number(e.target.value); setFromYM(`${y}-01`); setToYM(`${y}-12`); }}
+            className={`appearance-none border rounded-lg px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 cursor-pointer transition-colors ${
+              activeYear !== null
+                ? 'bg-gray-700 text-white border-gray-700'
+                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+            }`}
+          >
+            <option value="" disabled>Year</option>
+            {availableYears.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -596,7 +686,7 @@ export default function Reports() {
           title="Opening Balance"
           value={formatCurrency(yearConfig.initialBalance)}
           colorClass="text-blue-600"
-          subtitle={`Start of ${selectedYear}`}
+          subtitle={`Start of ${fromYear}`}
         />
         <StatCard
           title="Balance Change"
@@ -704,24 +794,6 @@ export default function Reports() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Property Income Stacked Bar ──────────────────────────────────── */}
-      <SectionHeader title="Property Income by Month" />
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={propertyData} barSize={28} barCategoryGap="30%">
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(1)}k`} />
-            <Tooltip content={<CurrencyTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
-            {incomeNames.map((name, i, arr) => (
-              <Bar key={name} dataKey={name} stackId="a"
-                fill={INCOME_COLORS[i % INCOME_COLORS.length]}
-                radius={i === arr.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
 
       {/* ── Savings Rate Line ────────────────────────────────────────────── */}
       <SectionHeader title="Savings Rate by Month" />
@@ -931,6 +1003,176 @@ export default function Reports() {
           </div>
         );
       })()}
+
+      {/* ── Year Comparison ──────────────────────────────────────────────── */}
+      {availableYears.length > 1 && (
+        <>
+          <SectionHeader title="Year Comparison" />
+
+          {/* Year summary stat cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {yearTotals.map(yt => (
+              <div key={yt.year} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-base font-black" style={{ color: yt.color }}>{yt.year}</span>
+                  <span className="text-xs text-gray-400">{yt.confirmed}/{yt.total} confirmed</span>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Income</span>
+                    <span className="font-bold text-emerald-600">{formatCurrency(yt.Income)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Expenses</span>
+                    <span className="font-bold text-red-500">{formatCurrency(yt.Expenses)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Saved</span>
+                    <span className="font-bold text-violet-600">{formatCurrency(yt.Saved)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Invested</span>
+                    <span className="font-bold text-blue-500">{formatCurrency(yt.Invested)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-100 pt-1.5 mt-1.5">
+                    <span className="text-gray-500">Avg. Rate</span>
+                    <span className={`font-black ${yt['Avg Rate'] >= 60 ? 'text-emerald-600' : yt['Avg Rate'] >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                      {yt['Avg Rate'].toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Save ratio</span>
+                    <span className="font-semibold text-gray-700">
+                      {yt.Income > 0 ? ((yt.Saved / yt.Income) * 100).toFixed(1) : '—'}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Expense ratio</span>
+                    <span className={`font-semibold ${yt.Income > 0 && (yt.Expenses / yt.Income) * 100 <= 40 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {yt.Income > 0 ? ((yt.Expenses / yt.Income) * 100).toFixed(1) : '—'}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Year totals bar chart */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Annual Totals — Income, Expenses & Saved</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={yearTotals} barSize={32} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="year" tick={{ fontSize: 13, fill: '#6b7280', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
+                <Tooltip content={<CurrencyTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 13 }} />
+                <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Saved" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Avg savings rate by year */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Average Savings Rate by Year</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={yearTotals} barSize={48} barCategoryGap="40%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="year" tick={{ fontSize: 13, fill: '#6b7280', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}%`} domain={[0, 100]} />
+                <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                <ReferenceLine y={60} stroke="#10b981" strokeDasharray="4 2" label={{ value: '60%', position: 'right', fontSize: 11, fill: '#10b981' }} />
+                <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: '40%', position: 'right', fontSize: 11, fill: '#f59e0b' }} />
+                <Bar dataKey="Avg Rate" radius={[4, 4, 0, 0]}>
+                  {yearTotals.map((yt, i) => (
+                    <Cell key={i} fill={yt['Avg Rate'] >= 60 ? '#10b981' : yt['Avg Rate'] >= 40 ? '#f59e0b' : '#ef4444'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Monthly income comparison by year */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Income — Year over Year</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={monthlyIncomeByYear} barCategoryGap="20%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
+                <Tooltip content={<CurrencyTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {availableYears.map((year, i) => (
+                  <Bar key={year} dataKey={String(year)} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} barSize={14} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Monthly expenses comparison by year */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Expenses — Year over Year</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={monthlyExpensesByYear} barCategoryGap="20%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
+                <Tooltip content={<CurrencyTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {availableYears.map((year, i) => (
+                  <Bar key={year} dataKey={String(year)} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} barSize={14} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Monthly saved comparison by year */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Amount Saved — Year over Year</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={monthlySavedByYear} barCategoryGap="20%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `€${(v / 1000).toFixed(1)}k`} />
+                <Tooltip content={<CurrencyTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {availableYears.map((year, i) => (
+                  <Bar key={year} dataKey={String(year)} fill={YEAR_COLORS[i % YEAR_COLORS.length]} radius={[3, 3, 0, 0]} barSize={14} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Monthly savings rate comparison by year */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Savings Rate — Year over Year</h3>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={monthlySavingsRateByYear}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}%`} domain={[0, 100]} />
+                <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <ReferenceLine y={60} stroke="#10b981" strokeDasharray="4 2" />
+                <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="4 2" />
+                {availableYears.map((year, i) => (
+                  <Line
+                    key={year}
+                    type="monotone"
+                    dataKey={String(year)}
+                    stroke={YEAR_COLORS[i % YEAR_COLORS.length]}
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
 
       {/* ── Cumulative Cash Flow ──────────────────────────────────────────── */}
       <SectionHeader title="Cumulative Cash Flow" />
