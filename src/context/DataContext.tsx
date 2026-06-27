@@ -496,10 +496,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const getAvailableYears = (): number[] => {
     const years = new Set<number>();
-    state.income.forEach(i => years.add(i.year));
-    state.expenses.forEach(e => years.add(e.year));
-    state.investments.forEach(i => years.add(i.year));
-    state.savings.forEach(s => years.add(s.year));
+    [...state.income, ...state.expenses, ...state.investments, ...state.savings]
+      .filter(i => i.amount !== 0)
+      .forEach(i => years.add(i.year));
     return Array.from(years).sort((a, b) => b - a);
   };
 
