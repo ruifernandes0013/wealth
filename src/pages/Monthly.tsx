@@ -426,8 +426,8 @@ export default function Monthly() {
     savingsAccountTotals[name] = computed.reduce((s, m) => s + (m.savingsItems.find(i => i.name === name)?.amount ?? 0), 0);
   });
 
-  const avgNetRate = computed.length > 0
-    ? computed.reduce((s, m) => s + (m.calc.cashIn > 0 ? (m.calc.netBankChange / m.calc.cashIn) * 100 : 0), 0) / computed.length : 0;
+  const avgSavingsPct = computed.length > 0
+    ? computed.reduce((s, m) => s + m.calc.savingsPct, 0) / computed.length : 0;
 
   const incomeGroupColspan = incomeNames.length + 2; // cols + add btn + CASH IN
 
@@ -610,7 +610,7 @@ export default function Monthly() {
                 <tr>
                   <th rowSpan={2} className="sticky left-0 z-20 bg-gray-900 text-white px-2 py-2 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-gray-700 align-middle">MONTH</th>
                   <th colSpan={incomeGroupColspan} className="bg-emerald-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-emerald-700">INCOME</th>
-                  <th colSpan={3} className="bg-red-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-red-700">OUTGOING</th>
+                  <th colSpan={5} className="bg-red-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-red-700">OUTGOING</th>
                   <th colSpan={5} className="bg-violet-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-violet-700">RESULT</th>
                   <th rowSpan={2} className="bg-gray-800 text-white text-center px-2 py-1 text-xs border-l border-gray-700 align-middle cursor-pointer">✓</th>
                 </tr>
@@ -620,10 +620,12 @@ export default function Monthly() {
                   ))}
                   <th className="px-2 py-1 bg-emerald-700/60 text-emerald-200" title="Add income column (use Income table below)">·</th>
                   <th className={`${thBase} bg-emerald-900 text-emerald-200 border-l border-emerald-600 font-bold`}>CASH IN</th>
-                  <th className={`${thBase} bg-red-700/80 text-red-100 border-l border-red-600`} title="Click cell to set override">EXPENSES</th>
-                  <th className={`${thBase} bg-amber-600/90 text-amber-100`}>EXTRA</th>
-                  <th className={`${thBase} bg-red-900 text-red-200 border-l border-red-700 font-bold`}>TOTAL OUT</th>
-                  <th className={`${thBase} bg-violet-700/80 text-violet-100 border-l border-violet-600 font-bold`}>NET</th>
+                  <th className={`${thBase} bg-red-700/80 text-red-100 border-l border-red-600`} title="Click cell to set override">G.EX.</th>
+                  <th className={`${thBase} bg-red-700/80 text-red-100`}>G.REAL</th>
+                  <th className={`${thBase} bg-red-700/80 text-red-100`}>SALDO</th>
+                  <th className={`${thBase} bg-red-700/80 text-red-100`}>INVEST/HOL.</th>
+                  <th className={`${thBase} bg-red-900 text-red-200 border-l border-red-600 font-bold`}>CASH OUT</th>
+                  <th className={`${thBase} bg-violet-700/80 text-violet-100 border-l border-violet-600 font-bold`}>SAVED</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100`}>RATE</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100`}>YTD</th>
                   <th className={`${thBase} bg-violet-900 text-violet-200 border-l border-violet-600 font-bold`}>BALANCE</th>
@@ -653,11 +655,13 @@ export default function Monthly() {
                       <td className="px-1" />
                       <td className={`${tdBase} font-bold text-sm border-l border-emerald-100 text-emerald-600`}>{formatCurrency(m.calc.cashIn)}</td>
                       {GE(m, 'text-gray-500')}
-                      <td className={`${tdBase} text-xs ${m.calc.savingsTotal > 0 ? 'text-amber-600' : 'text-gray-300'}`}>{m.calc.savingsTotal > 0 ? formatCurrency(m.calc.savingsTotal) : '—'}</td>
-                      <td className={`${tdBase} font-bold text-sm border-l border-red-100 text-red-600`}>{formatCurrency(m.calc.gastosEx + m.calc.savingsTotal)}</td>
-                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.netBankChange < 0 ? 'text-red-500' : 'text-violet-600'}`}>{formatCurrency(m.calc.netBankChange)}</td>
-                      {(() => { const rate = m.calc.cashIn > 0 ? (m.calc.netBankChange / m.calc.cashIn) * 100 : 0; return <td className={`${tdBase} text-xs font-semibold ${rate >= 60 ? 'text-emerald-600' : rate >= 40 ? 'text-sky-500' : rate >= 20 ? 'text-amber-500' : 'text-red-500'}`}>{formatPct(rate)}</td>; })()}
-                      <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.totalBalance - yearConfig.initialBalance)}</td>
+                      <td className={`${tdBase} text-xs border-l border-red-50 text-gray-500`}>{formatCurrency(m.calc.gastosR)}</td>
+                      <td className={`${tdBase} text-xs ${m.calc.saldo > 0 ? 'text-orange-500' : 'text-gray-400'}`}>{m.calc.saldo !== 0 ? formatCurrency(m.calc.saldo) : '—'}</td>
+                      <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.calc.savingsTotal)}</td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-red-100 text-red-600`}>{formatCurrency(m.calc.cashOut)}</td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.guardado < 0 ? 'text-red-500' : 'text-violet-600'}`}>{formatCurrency(m.calc.guardado)}</td>
+                      <td className={`${tdBase} text-xs font-semibold ${m.calc.savingsPct >= 60 ? 'text-emerald-600' : m.calc.savingsPct >= 40 ? 'text-sky-500' : m.calc.savingsPct >= 20 ? 'text-amber-500' : 'text-red-500'}`}>{formatPct(m.calc.savingsPct)}</td>
+                      <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.ano)}</td>
                       <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.totalBalance < 0 ? 'text-red-500' : 'text-blue-600'}`}>{formatCurrency(m.totalBalance)}</td>
                       <td className={`${tdBase} text-xs ${m.totalBalance - m.totalSavingsBalance < 0 ? 'text-red-400' : 'text-blue-400'}`}>{formatCurrency(m.totalBalance - m.totalSavingsBalance)}</td>
                       <td className="px-2 py-1.5 text-center border-l border-gray-100 whitespace-nowrap cursor-pointer" onClick={() => toggleConfirmed(m)}>
@@ -677,10 +681,12 @@ export default function Monthly() {
                     <td className="px-1" />
                     <td className={`${tdBase} text-sm text-emerald-300 border-l border-gray-700`}>{formatCurrency(totals.cashIn)}</td>
                     <td className={`${tdBase} text-xs text-gray-300 border-l border-gray-700`}>{formatCurrency(totals.gastosEx)}</td>
-                    <td className={`${tdBase} text-xs text-amber-300`}>{formatCurrency(totals.savingsTotal)}</td>
-                    <td className={`${tdBase} text-sm text-red-300 border-l border-gray-700`}>{formatCurrency(totals.gastosEx + totals.savingsTotal)}</td>
-                    <td className={`${tdBase} text-sm text-violet-300 border-l border-gray-700`}>{formatCurrency(totals.cashIn - totals.gastosEx - totals.savingsTotal)}</td>
-                    <td className={`${tdBase} text-xs text-gray-300`}>{formatPct(avgNetRate)}</td>
+                    <td className={`${tdBase} text-xs text-gray-300`}>{formatCurrency(totals.gastosR)}</td>
+                    <td className={`${tdBase} text-xs text-orange-300`}>{formatCurrency(totals.saldo)}</td>
+                    <td className={`${tdBase} text-xs text-violet-300`}>{formatCurrency(totals.savingsTotal)}</td>
+                    <td className={`${tdBase} text-sm text-red-300 border-l border-gray-700`}>{formatCurrency(totals.cashOut)}</td>
+                    <td className={`${tdBase} text-sm text-violet-300 border-l border-gray-700`}>{formatCurrency(totals.guardado)}</td>
+                    <td className={`${tdBase} text-xs text-gray-300`}>{formatPct(avgSavingsPct)}</td>
                     <td className={`${tdBase} text-xs text-gray-400`}>—</td>
                     <td className={`${tdBase} text-sm text-blue-300 border-l border-gray-700`}>{formatCurrency(computed[computed.length - 1]?.totalBalance ?? 0)}</td>
                     <td className={`${tdBase} text-xs text-blue-200`}>{formatCurrency((computed[computed.length - 1]?.totalBalance ?? 0) - (computed[computed.length - 1]?.totalSavingsBalance ?? 0))}</td>
