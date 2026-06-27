@@ -659,12 +659,7 @@ export default function Monthly() {
                       <td className={`${tdBase} text-xs ${m.calc.saldo > 0 ? 'text-orange-500' : 'text-gray-400'}`}>{m.calc.saldo !== 0 ? formatCurrency(m.calc.saldo) : '—'}</td>
                       <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.calc.savingsTotal)}</td>
                       <td className={`${tdBase} font-bold text-sm border-l border-red-100 text-red-600`}>{formatCurrency(m.calc.cashOut)}</td>
-                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.guardado < 0 ? 'text-red-500' : 'text-violet-600'}`}>
-                        <div>{formatCurrency(m.calc.guardado)}</div>
-                        {m.calc.savingsDeposits > 0 && (
-                          <div className="text-[9px] font-normal text-teal-500 leading-none mt-0.5" title="Includes savings deposits">+{formatCurrency(m.calc.savingsDeposits)} sav.</div>
-                        )}
-                      </td>
+                      <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.guardado < 0 ? 'text-red-500' : 'text-violet-600'}`}>{formatCurrency(m.calc.guardado)}</td>
                       <td className={`${tdBase} text-xs font-semibold ${m.calc.savingsPct >= 60 ? 'text-emerald-600' : m.calc.savingsPct >= 40 ? 'text-sky-500' : m.calc.savingsPct >= 20 ? 'text-amber-500' : 'text-red-500'}`}>{formatPct(m.calc.savingsPct)}</td>
                       <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.ano)}</td>
                       <td className={`${tdBase} text-xs font-semibold ${m.totalSavingsBalance > 0 ? 'text-teal-600' : 'text-gray-300'}`}>{m.totalSavingsBalance > 0 ? formatCurrency(m.totalSavingsBalance) : '—'}</td>
@@ -690,12 +685,7 @@ export default function Monthly() {
                     <td className={`${tdBase} text-xs text-orange-300`}>{formatCurrency(totals.saldo)}</td>
                     <td className={`${tdBase} text-xs text-violet-300`}>{formatCurrency(totals.savingsTotal)}</td>
                     <td className={`${tdBase} text-sm text-red-300 border-l border-gray-700`}>{formatCurrency(totals.cashOut)}</td>
-                    <td className={`${tdBase} text-sm text-violet-300 border-l border-gray-700`}>
-                      <div>{formatCurrency(totals.guardado)}</div>
-                      {totals.savingsDeposits > 0 && (
-                        <div className="text-[9px] font-normal text-teal-400 leading-none mt-0.5">+{formatCurrency(totals.savingsDeposits)} sav.</div>
-                      )}
-                    </td>
+                    <td className={`${tdBase} text-sm text-violet-300 border-l border-gray-700`}>{formatCurrency(totals.guardado)}</td>
                     <td className={`${tdBase} text-xs text-gray-300`}>{formatPct(avgSavingsPct)}</td>
                     <td className={`${tdBase} text-xs text-gray-400`}>—</td>
                     <td className={`${tdBase} text-xs text-teal-300`}>{formatCurrency(computed[computed.length - 1]?.totalSavingsBalance ?? 0)}</td>

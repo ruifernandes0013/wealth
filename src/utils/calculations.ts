@@ -16,7 +16,7 @@ export function calcMonthFromItems(
   const cashOut = gastosEx;
   const guardado = cashIn - gastosEx;
   const savingsPct = cashIn > 0 ? (guardado / cashIn) * 100 : 0;
-  const netBankChange = cashIn - cashOut;
+  const netBankChange = cashIn - cashOut - savingsTotal;
   return { cashIn, gastosR, gastosEx, saldo, savingsTotal, savingsDeposits, cashOut, guardado, savingsPct, netBankChange };
 }
 
