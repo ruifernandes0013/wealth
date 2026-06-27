@@ -142,36 +142,6 @@ export default function Compare() {
     fill: YEAR_COLORS[i % YEAR_COLORS.length],
   }));
 
-  const insights: { type: 'positive' | 'negative' | 'neutral'; text: string }[] = [];
-  if (yearStats.length >= 2) {
-    const sorted = [...yearStats].sort((a, b) => a.year - b.year);
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1];
-      const cur = sorted[i];
-      const incomeGrowth = prev.totalIncome > 0 ? ((cur.totalIncome - prev.totalIncome) / prev.totalIncome) * 100 : 0;
-      const expenseChange = prev.totalExpenses > 0 ? ((cur.totalExpenses - prev.totalExpenses) / prev.totalExpenses) * 100 : 0;
-      const rateChange = cur.avgSavingsRate - prev.avgSavingsRate;
-
-      if (incomeGrowth > 5) insights.push({ type: 'positive', text: `Income grew ${incomeGrowth.toFixed(1)}% from ${prev.year} to ${cur.year} (+${formatCurrency(cur.totalIncome - prev.totalIncome)}).` });
-      else if (incomeGrowth < -5) insights.push({ type: 'negative', text: `Income fell ${Math.abs(incomeGrowth).toFixed(1)}% from ${prev.year} to ${cur.year} (${formatCurrency(cur.totalIncome - prev.totalIncome)}).` });
-      else insights.push({ type: 'neutral', text: `Income was stable from ${prev.year} to ${cur.year} (${incomeGrowth > 0 ? '+' : ''}${incomeGrowth.toFixed(1)}%).` });
-
-      if (expenseChange > 10) insights.push({ type: 'negative', text: `Expenses rose ${expenseChange.toFixed(1)}% from ${prev.year} to ${cur.year} (+${formatCurrency(cur.totalExpenses - prev.totalExpenses)}).` });
-      else if (expenseChange < -5) insights.push({ type: 'positive', text: `Expenses fell ${Math.abs(expenseChange).toFixed(1)}% from ${prev.year} to ${cur.year} (${formatCurrency(cur.totalExpenses - prev.totalExpenses)}).` });
-
-      if (rateChange > 5) insights.push({ type: 'positive', text: `Savings rate improved ${rateChange.toFixed(1)}pp from ${prev.year} (${formatPct(prev.avgSavingsRate)}) to ${cur.year} (${formatPct(cur.avgSavingsRate)}).` });
-      else if (rateChange < -5) insights.push({ type: 'negative', text: `Savings rate dropped ${Math.abs(rateChange).toFixed(1)}pp from ${prev.year} (${formatPct(prev.avgSavingsRate)}) to ${cur.year} (${formatPct(cur.avgSavingsRate)}).` });
-    }
-
-    const bestRateYear = [...yearStats].sort((a, b) => b.avgSavingsRate - a.avgSavingsRate)[0];
-    const bestIncomeYear = [...yearStats].sort((a, b) => b.totalIncome - a.totalIncome)[0];
-    const lowestExpYear = [...yearStats].filter(s => s.totalExpenses > 0).sort((a, b) => a.totalExpenses - b.totalExpenses)[0];
-
-    if (bestRateYear) insights.push({ type: 'neutral', text: `Best savings rate year: ${bestRateYear.year} at ${formatPct(bestRateYear.avgSavingsRate)}.` });
-    if (bestIncomeYear) insights.push({ type: 'positive', text: `Highest income year: ${bestIncomeYear.year} with ${formatCurrency(bestIncomeYear.totalIncome)}.` });
-    if (lowestExpYear) insights.push({ type: 'positive', text: `Lowest expense year: ${lowestExpYear.year} at ${formatCurrency(lowestExpYear.totalExpenses)}.` });
-  }
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -328,26 +298,6 @@ export default function Compare() {
         </ResponsiveContainer>
       </div>
 
-      {/* Insights */}
-      {insights.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4">Insights</h3>
-          <div className="space-y-2.5">
-            {insights.map((ins, i) => (
-              <div key={i} className={`flex items-start gap-2.5 p-3 rounded-lg text-sm ${
-                ins.type === 'positive' ? 'bg-emerald-50 text-emerald-800' :
-                ins.type === 'negative' ? 'bg-red-50 text-red-800' :
-                'bg-gray-50 text-gray-700'
-              }`}>
-                <span className="mt-0.5 flex-shrink-0 font-bold">
-                  {ins.type === 'positive' ? '✓' : ins.type === 'negative' ? '↓' : '→'}
-                </span>
-                {ins.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
