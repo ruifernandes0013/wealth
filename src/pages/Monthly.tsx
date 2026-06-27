@@ -611,7 +611,7 @@ export default function Monthly() {
                   <th rowSpan={2} className="sticky left-0 z-20 bg-gray-900 text-white px-2 py-2 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-gray-700 align-middle">MONTH</th>
                   <th colSpan={incomeGroupColspan} className="bg-emerald-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-emerald-700">INCOME</th>
                   <th colSpan={5} className="bg-red-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-red-700">OUTGOING</th>
-                  <th colSpan={5} className="bg-violet-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-violet-700">RESULT</th>
+                  <th colSpan={4} className="bg-violet-600 text-white text-center text-xs font-bold uppercase tracking-widest py-2 border-x border-violet-700">RESULT</th>
                   <th rowSpan={2} className="bg-gray-800 text-white text-center px-2 py-1 text-xs border-l border-gray-700 align-middle cursor-pointer">✓</th>
                 </tr>
                 <tr>
@@ -628,7 +628,6 @@ export default function Monthly() {
                   <th className={`${thBase} bg-violet-700/80 text-violet-100 border-l border-violet-600 font-bold`}>SAVED</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100`}>RATE</th>
                   <th className={`${thBase} bg-violet-700/80 text-violet-100`}>YTD</th>
-                  <th className={`${thBase} bg-violet-700/80 text-violet-100`}>SAV.BAL</th>
                   <th className={`${thBase} bg-violet-900 text-violet-200 border-l border-violet-600 font-bold`}>BALANCE</th>
                 </tr>
               </thead>
@@ -662,7 +661,6 @@ export default function Monthly() {
                       <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.calc.guardado < 0 ? 'text-red-500' : 'text-violet-600'}`}>{formatCurrency(m.calc.guardado)}</td>
                       <td className={`${tdBase} text-xs font-semibold ${m.calc.savingsPct >= 60 ? 'text-emerald-600' : m.calc.savingsPct >= 40 ? 'text-sky-500' : m.calc.savingsPct >= 20 ? 'text-amber-500' : 'text-red-500'}`}>{formatPct(m.calc.savingsPct)}</td>
                       <td className={`${tdBase} text-xs text-violet-500`}>{formatCurrency(m.ano)}</td>
-                      <td className={`${tdBase} text-xs font-semibold ${m.totalSavingsBalance > 0 ? 'text-teal-600' : 'text-gray-300'}`}>{m.totalSavingsBalance > 0 ? formatCurrency(m.totalSavingsBalance) : '—'}</td>
                       <td className={`${tdBase} font-bold text-sm border-l border-violet-100 ${m.totalBalance < 0 ? 'text-red-500' : 'text-blue-600'}`}>{formatCurrency(m.totalBalance)}</td>
                       <td className="px-2 py-1.5 text-center border-l border-gray-100 whitespace-nowrap cursor-pointer" onClick={() => toggleConfirmed(m)}>
                         {m.confirmed ? <CheckCircle className="w-4 h-4 text-emerald-500 mx-auto" /> : <Circle className="w-4 h-4 text-gray-200 mx-auto hover:text-gray-400 transition-colors" />}
@@ -688,7 +686,6 @@ export default function Monthly() {
                     <td className={`${tdBase} text-sm text-violet-300 border-l border-gray-700`}>{formatCurrency(totals.guardado)}</td>
                     <td className={`${tdBase} text-xs text-gray-300`}>{formatPct(avgSavingsPct)}</td>
                     <td className={`${tdBase} text-xs text-gray-400`}>—</td>
-                    <td className={`${tdBase} text-xs text-teal-300`}>{formatCurrency(computed[computed.length - 1]?.totalSavingsBalance ?? 0)}</td>
                     <td className={`${tdBase} text-sm text-blue-300 border-l border-gray-700`}>{formatCurrency(computed[computed.length - 1]?.totalBalance ?? 0)}</td>
                     <td className="px-2 py-1.5 text-center text-xs text-gray-400 border-l border-gray-700">{confirmedCount}/{computed.length}</td>
                   </tr>
