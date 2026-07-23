@@ -228,11 +228,28 @@ export default function Monthly() {
     upsertLineItem, addLineItem, deleteLineItem, updateMonthMeta, updateYearConfig, addYear,
     getMonthsForYear, getYearConfig, getAvailableYears,
     selectedYear, setSelectedYear, selectedMonth, setSelectedMonth,
+    pendingYear, setPendingYear, discardPendingYear,
   } = useData();
 
   const availableYears = getAvailableYears();
   const currentMonth = selectedMonth;
   const setCurrentMonth = (month: number) => { void setSelectedMonth(month); };
+
+  const [discardConfirm, setDiscardConfirm] = useState<{ year: number } | null>(null);
+
+  const guardedSetYear = (year: number) => {
+    if (pendingYear !== null && year !== pendingYear) {
+      setDiscardConfirm({ year });
+      return;
+    }
+    void setSelectedYear(year);
+  };
+
+  const handleAddYear = async (year: number) => {
+    await addYear(year);
+    setPendingYear(year);
+    void setSelectedYear(year);
+  };
   const [balanceInput, setBalanceInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
   const [activeNote, setActiveNote] = useState<ActiveNote | null>(null);
@@ -554,15 +571,15 @@ export default function Monthly() {
             <YearSelector
               selectedYear={selectedYear}
               availableYears={availableYears}
-              onSelectYear={y => { void setSelectedYear(y); }}
-              onCreateYear={addYear}
+              onSelectYear={guardedSetYear}
+              onAddYear={handleAddYear}
             />
             <MonthSelector
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               availableYears={availableYears}
               onChange={(year, month) => {
-                if (year !== selectedYear) void setSelectedYear(year);
+                if (year !== selectedYear) { guardedSetYear(year); return; }
                 void setSelectedMonth(month);
               }}
             />
@@ -1008,6 +1025,20 @@ export default function Monthly() {
           onSave={saveNote}
           onClose={() => setActiveNote(null)}
         />
+      )}
+
+      {discardConfirm && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/30" />
+          <div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 w-80">
+            <h3 className="text-sm font-bold text-gray-800 mb-2">Discard new year?</h3>
+            <p className="text-sm text-gray-500 mb-5">Year {pendingYear} has no data yet. If you switch, it will be deleted.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDiscardConfirm(null)} className="flex-1 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">Stay</button>
+              <button onClick={async () => { await discardPendingYear(); setDiscardConfirm(null); void setSelectedYear(discardConfirm.year); }} className="flex-1 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors">Discard & Switch</button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

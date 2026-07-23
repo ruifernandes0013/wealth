@@ -15,6 +15,7 @@ import {
   Percent,
   Landmark,
 } from 'lucide-react';
+import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
@@ -24,8 +25,24 @@ import MonthSelector from '../components/MonthSelector';
 import { MONTH_NAMES_PT } from '../types';
 
 export default function Dashboard() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear, selectedYear, setSelectedYear, selectedMonth, setSelectedMonth } = useData();
+  const { state, getMonthsForYear, getYearConfig, getAvailableYears, addYear, selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, pendingYear, setPendingYear, discardPendingYear } = useData();
   const availableYears = getAvailableYears();
+
+  const [discardConfirm, setDiscardConfirm] = useState<{ year: number } | null>(null);
+
+  const guardedSetYear = (year: number) => {
+    if (pendingYear !== null && year !== pendingYear) {
+      setDiscardConfirm({ year });
+      return;
+    }
+    void setSelectedYear(year);
+  };
+
+  const handleAddYear = async (year: number) => {
+    await addYear(year);
+    setPendingYear(year);
+    void setSelectedYear(year);
+  };
 
   const months = getMonthsForYear(selectedYear);
   const yearConfig = getYearConfig(selectedYear);
@@ -72,7 +89,7 @@ export default function Dashboard() {
             selectedMonth={selectedMonth}
             availableYears={availableYears}
             onChange={(year, month) => {
-              if (year !== selectedYear) void setSelectedYear(year);
+              if (year !== selectedYear) { guardedSetYear(year); return; }
               void setSelectedMonth(month);
             }}
           />
@@ -80,8 +97,8 @@ export default function Dashboard() {
           <YearSelector
             selectedYear={selectedYear}
             availableYears={availableYears}
-            onSelectYear={setSelectedYear}
-            onCreateYear={addYear}
+            onSelectYear={guardedSetYear}
+            onAddYear={handleAddYear}
           />
         </div>
       </div>
@@ -213,6 +230,20 @@ export default function Dashboard() {
           })}
         </div>
       </div>
+
+      {discardConfirm && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/30" />
+          <div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 w-80">
+            <h3 className="text-sm font-bold text-gray-800 mb-2">Discard new year?</h3>
+            <p className="text-sm text-gray-500 mb-5">Year {pendingYear} has no data yet. If you switch, it will be deleted.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDiscardConfirm(null)} className="flex-1 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">Stay</button>
+              <button onClick={async () => { await discardPendingYear(); setDiscardConfirm(null); void setSelectedYear(discardConfirm.year); }} className="flex-1 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors">Discard & Switch</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

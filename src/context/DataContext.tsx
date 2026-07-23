@@ -9,7 +9,8 @@ type Action =
   | { type: 'UPDATE_MONTH_META'; payload: MonthMeta }
   | { type: 'UPSERT_LINE_ITEM'; table: 'income' | 'expenses' | 'investments' | 'savings'; payload: LineItem }
   | { type: 'DELETE_LINE_ITEM'; table: 'income' | 'expenses' | 'investments' | 'savings'; id: string }
-  | { type: 'UPDATE_YEAR_CONFIG'; payload: YearConfig };
+  | { type: 'UPDATE_YEAR_CONFIG'; payload: YearConfig }
+  | { type: 'DELETE_YEAR'; year: number };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -40,6 +41,17 @@ function reducer(state: AppState, action: Action): AppState {
         ? state.yearConfigs.map(c => c.year === action.payload.year ? action.payload : c)
         : [...state.yearConfigs, action.payload];
       return { ...state, yearConfigs };
+    }
+    case 'DELETE_YEAR': {
+      return {
+        ...state,
+        months: state.months.filter(m => m.year !== action.year),
+        income: state.income.filter(i => i.year !== action.year),
+        expenses: state.expenses.filter(e => e.year !== action.year),
+        investments: state.investments.filter(i => i.year !== action.year),
+        savings: state.savings.filter(s => s.year !== action.year),
+        yearConfigs: state.yearConfigs.filter(c => c.year !== action.year),
+      };
     }
     default:
       return state;
@@ -91,6 +103,9 @@ interface DataContextValue {
   setSelectedYear: (year: number) => Promise<void>;
   setSelectedMonth: (month: number) => Promise<void>;
   reload: () => void;
+  pendingYear: number | null;
+  setPendingYear: (year: number | null) => void;
+  discardPendingYear: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -103,6 +118,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const reload = () => setReloadKey(k => k + 1);
+
+  const [pendingYear, setPendingYearState] = useState<number | null>(null);
+  const pendingYearRef = useRef<number | null>(null);
+  const setPendingYear = (year: number | null) => {
+    setPendingYearState(year);
+    pendingYearRef.current = year;
+  };
 
   const _today = new Date();
   const [selectedYear, setSelectedYearState] = useState(_today.getFullYear());
@@ -376,6 +398,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       sort_order: item.sortOrder ?? 0,
     }, { onConflict: 'id' });
     if (error) console.error(`[upsertLineItem:${table}] Supabase error:`, error.message, error.details);
+    if (pendingYearRef.current === item.year) setPendingYear(null);
   };
 
   const deleteLineItem = async (table: 'income' | 'expenses' | 'investments' | 'savings', id: string) => {
@@ -477,6 +500,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const discardPendingYear = async () => {
+    const year = pendingYearRef.current;
+    if (!year || !user) { setPendingYear(null); return; }
+    await Promise.all([
+      supabase.from('months').delete().eq('user_id', user.id).eq('year', year),
+      supabase.from('income').delete().eq('user_id', user.id).eq('year', year),
+      supabase.from('expenses').delete().eq('user_id', user.id).eq('year', year),
+      supabase.from('investments').delete().eq('user_id', user.id).eq('year', year),
+      supabase.from('savings').delete().eq('user_id', user.id).eq('year', year),
+      supabase.from('year_configs').delete().eq('user_id', user.id).eq('year', year),
+    ]);
+    dispatch({ type: 'DELETE_YEAR', year });
+    setPendingYear(null);
+  };
+
   const updateYearConfig = async (config: YearConfig) => {
     if (!user) return;
     pushHistory();
@@ -499,6 +537,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [...state.income, ...state.expenses, ...state.investments, ...state.savings]
       .filter(i => i.amount !== 0)
       .forEach(i => years.add(i.year));
+    if (pendingYearRef.current !== null) years.add(pendingYearRef.current);
     return Array.from(years).sort((a, b) => b - a);
   };
 
@@ -509,6 +548,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updateMonthMeta, upsertLineItem, deleteLineItem, addLineItem,
       updateYearConfig, addYear, getMonthsForYear, getYearConfig, getAvailableYears,
       selectedYear, selectedMonth, setSelectedYear, setSelectedMonth, reload,
+      pendingYear, setPendingYear, discardPendingYear,
     }}>
       {children}
     </DataContext.Provider>
