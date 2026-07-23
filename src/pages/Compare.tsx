@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, PiggyBank, Landmark, ArrowUp, ArrowDown } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useAllYearsLineItems } from '../hooks/useAllYearsLineItems';
 import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
 import { MONTH_NAMES_PT } from '../types';
@@ -65,7 +66,8 @@ function PctTooltip({ active, payload, label }: { active?: boolean; payload?: { 
 }
 
 export default function Compare() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears } = useData();
+  const { getMonthsForYear, getYearConfig, getAvailableYears } = useData();
+  const state = useAllYearsLineItems();
   const availableYears = getAvailableYears().sort((a, b) => a - b);
   const [selectedYears, setSelectedYears] = useState<number[]>(availableYears);
 

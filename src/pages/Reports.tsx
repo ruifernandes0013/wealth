@@ -28,6 +28,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { useAllYearsLineItems } from '../hooks/useAllYearsLineItems';
 import { calcYearMonths } from '../utils/calculations';
 import { formatCurrency, formatPct } from '../utils/format';
 import StatCard from '../components/StatCard';
@@ -225,7 +226,8 @@ const MONTH_NAMES_FULL = MONTH_NAMES_FULL_PT;
 const YEAR_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4'];
 
 export default function Reports() {
-  const { state, getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
+  const { getMonthsForYear, getYearConfig, getAvailableYears, loading } = useData();
+  const state = useAllYearsLineItems();
   const availableYears = getAvailableYears();
 
   const _today = new Date();

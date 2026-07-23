@@ -6,6 +6,8 @@ import { useAuth } from './AuthContext';
 
 type Action =
   | { type: 'SET_STATE'; payload: AppState }
+  | { type: 'SET_CORE'; payload: { months: MonthMeta[]; yearConfigs: YearConfig[] } }
+  | { type: 'SET_YEAR_LINE_ITEMS'; payload: { income: LineItem[]; expenses: LineItem[]; investments: LineItem[]; savings: LineItem[] } }
   | { type: 'UPDATE_MONTH_META'; payload: MonthMeta }
   | { type: 'UPSERT_LINE_ITEM'; table: 'income' | 'expenses' | 'investments' | 'savings'; payload: LineItem }
   | { type: 'DELETE_LINE_ITEM'; table: 'income' | 'expenses' | 'investments' | 'savings'; id: string }
@@ -16,6 +18,10 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_STATE':
       return action.payload;
+    case 'SET_CORE':
+      return { ...state, months: action.payload.months, yearConfigs: action.payload.yearConfigs };
+    case 'SET_YEAR_LINE_ITEMS':
+      return { ...state, ...action.payload };
     case 'UPDATE_MONTH_META': {
       const exists = state.months.find(m => m.id === action.payload.id);
       const months = exists
@@ -226,43 +232,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await syncDiff(current, next);
   };
 
+  // Core load: months, year configs, prefs, and a slim (year, amount) scan used
+  // only to know which years have any non-zero data (for the year selector).
+  // The actual income/expenses/investments/savings rows are loaded per-year below.
+  const [coreReady, setCoreReady] = useState(false);
+  const [availableYearsState, setAvailableYearsState] = useState<Set<number>>(new Set());
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
+      setCoreReady(false);
       return;
     }
     let cancelled = false;
 
-    async function load() {
+    async function loadCore() {
       setLoading(true);
-      const [monthsRes, configsRes, incomeRes, expensesRes, investmentsRes, savingsRes, prefsRes] = await Promise.all([
+      setCoreReady(false);
+      const [monthsRes, configsRes, prefsRes, yiRes, yeRes, yvRes, ysRes] = await Promise.all([
         supabase.from('months').select('*').eq('user_id', user!.id),
         supabase.from('year_configs').select('*').eq('user_id', user!.id),
-        supabase.from('income').select('*').eq('user_id', user!.id),
-        supabase.from('expenses').select('*').eq('user_id', user!.id),
-        supabase.from('investments').select('*').eq('user_id', user!.id),
-        supabase.from('savings').select('*').eq('user_id', user!.id),
         supabase.from('user_preferences').select('*').eq('user_id', user!.id),
+        supabase.from('income').select('year, amount').eq('user_id', user!.id),
+        supabase.from('expenses').select('year, amount').eq('user_id', user!.id),
+        supabase.from('investments').select('year, amount').eq('user_id', user!.id),
+        supabase.from('savings').select('year, amount').eq('user_id', user!.id),
       ]);
 
       if (cancelled) return;
 
       if (monthsRes.error) console.error('[load] months error:', monthsRes.error);
       if (configsRes.error) console.error('[load] year_configs error:', configsRes.error);
-      if (incomeRes.error) console.error('[load] income error:', incomeRes.error);
-      if (expensesRes.error) console.error('[load] expenses error:', expensesRes.error);
-      if (investmentsRes.error) console.error('[load] investments error:', investmentsRes.error);
-      if (savingsRes.error) console.error('[load] savings error:', savingsRes.error);
 
       const months: MonthMeta[] = (monthsRes.data || []).map(rowToMonthMeta);
       const yearConfigs: YearConfig[] = (configsRes.data || []).map(r => ({
         year: r.year,
         initialBalance: r.initial_balance,
       }));
-      const income: LineItem[] = (incomeRes.data || []).map(rowToLineItem);
-      const expenses: LineItem[] = (expensesRes.data || []).map(rowToLineItem);
-      const investments: LineItem[] = (investmentsRes.data || []).map(rowToLineItem);
-      const savings: LineItem[] = (savingsRes.data || []).map(rowToLineItem);
 
       // If no data exists, seed it
       if (months.length === 0) {
@@ -296,25 +302,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (eRes.error) console.error('[seed] expenses error:', eRes.error);
         if (invRes.error) console.error('[seed] investments error:', invRes.error);
 
-        // Re-fetch after seeding to get server-generated IDs
-        const [iRes2, eRes2, invRes2] = await Promise.all([
-          supabase.from('income').select('*').eq('user_id', user!.id),
-          supabase.from('expenses').select('*').eq('user_id', user!.id),
-          supabase.from('investments').select('*').eq('user_id', user!.id),
-        ]);
-        dispatch({
-          type: 'SET_STATE',
-          payload: {
-            months: seedMonths,
-            yearConfigs: seedYearConfigs,
-            income: (iRes2.data || []).map(rowToLineItem),
-            expenses: (eRes2.data || []).map(rowToLineItem),
-            investments: (invRes2.data || []).map(rowToLineItem),
-            savings: [],
-          },
-        });
+        dispatch({ type: 'SET_CORE', payload: { months: seedMonths, yearConfigs: seedYearConfigs } });
+
+        const seedYears = new Set<number>();
+        [...seedIncome, ...seedExpenses, ...seedInvestments]
+          .filter(i => i.amount !== 0)
+          .forEach(i => seedYears.add(i.year));
+        setAvailableYearsState(seedYears);
       } else {
-        dispatch({ type: 'SET_STATE', payload: { months, yearConfigs, income, expenses, investments, savings } });
+        dispatch({ type: 'SET_CORE', payload: { months, yearConfigs } });
+
+        if (yiRes.error) console.error('[load] income years error:', yiRes.error);
+        if (yeRes.error) console.error('[load] expenses years error:', yeRes.error);
+        if (yvRes.error) console.error('[load] investments years error:', yvRes.error);
+        if (ysRes.error) console.error('[load] savings years error:', ysRes.error);
+        const years = new Set<number>();
+        [...(yiRes.data || []), ...(yeRes.data || []), ...(yvRes.data || []), ...(ysRes.data || [])]
+          .filter(r => Number(r.amount) !== 0)
+          .forEach(r => years.add(r.year as number));
+        setAvailableYearsState(years);
       }
 
       if (prefsRes.data && prefsRes.data.length > 0) {
@@ -332,12 +338,82 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
 
       setLoading(false);
+      setCoreReady(true);
     }
 
-    load();
+    loadCore();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, reloadKey]);
+
+  // Tracks which year's data is currently reflected in state.income/etc, so the
+  // availableYears sync effect below can ignore stale data while a fetch is in flight.
+  const loadedYearRef = useRef<number | null>(null);
+
+  // Per-year load: fetches income/expenses/investments/savings for the
+  // currently selected year only. Always hits the network (no caching) and
+  // re-runs whenever the selected year changes.
+  useEffect(() => {
+    if (!user || !coreReady) return;
+    let cancelled = false;
+
+    async function loadYearLineItems() {
+      const year = selectedYear;
+      const [incomeRes, expensesRes, investmentsRes, savingsRes] = await Promise.all([
+        supabase.from('income').select('*').eq('user_id', user!.id).eq('year', year),
+        supabase.from('expenses').select('*').eq('user_id', user!.id).eq('year', year),
+        supabase.from('investments').select('*').eq('user_id', user!.id).eq('year', year),
+        supabase.from('savings').select('*').eq('user_id', user!.id).eq('year', year),
+      ]);
+
+      if (cancelled) return;
+
+      if (incomeRes.error) console.error('[loadYear] income error:', incomeRes.error);
+      if (expensesRes.error) console.error('[loadYear] expenses error:', expensesRes.error);
+      if (investmentsRes.error) console.error('[loadYear] investments error:', investmentsRes.error);
+      if (savingsRes.error) console.error('[loadYear] savings error:', savingsRes.error);
+
+      loadedYearRef.current = year;
+      dispatch({
+        type: 'SET_YEAR_LINE_ITEMS',
+        payload: {
+          income: (incomeRes.data || []).map(rowToLineItem),
+          expenses: (expensesRes.data || []).map(rowToLineItem),
+          investments: (investmentsRes.data || []).map(rowToLineItem),
+          savings: (savingsRes.data || []).map(rowToLineItem),
+        },
+      });
+    }
+
+    loadYearLineItems();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, selectedYear, coreReady, reloadKey]);
+
+  // Reset undo/redo history on year change — snapshots are only valid within
+  // the year they were taken for, since line-item state is now year-scoped.
+  useEffect(() => {
+    historyRef.current = { past: [], future: [] };
+    setCanUndo(false);
+    setCanRedo(false);
+  }, [selectedYear]);
+
+  // Keep the "years with data" set in sync with the currently loaded year,
+  // without a network round-trip — other years' membership is untouched.
+  // Skipped while a fetch for a different year is still in flight, so stale
+  // (previous-year) data can't momentarily hide the year being switched to.
+  useEffect(() => {
+    if (loadedYearRef.current !== selectedYear) return;
+    const hasData = [...state.income, ...state.expenses, ...state.investments, ...state.savings]
+      .some(i => i.year === selectedYear && i.amount !== 0);
+    setAvailableYearsState(prev => {
+      const has = prev.has(selectedYear);
+      if (hasData === has) return prev;
+      const next = new Set(prev);
+      if (hasData) next.add(selectedYear); else next.delete(selectedYear);
+      return next;
+    });
+  }, [state.income, state.expenses, state.investments, state.savings, selectedYear]);
 
   const setSelectedYear = async (year: number) => {
     setSelectedYearState(year);
@@ -477,7 +553,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (sourceYear == null) return;
     const lineTables = ['income', 'expenses', 'investments', 'savings'] as const;
     for (const tbl of lineTables) {
-      const uniqueNames = [...new Set(stateRef.current[tbl].filter(i => i.year === sourceYear).map(i => i.name))];
+      const sourceRes = await supabase.from(tbl).select('name').eq('user_id', user.id).eq('year', sourceYear);
+      if (sourceRes.error) {
+        console.error(`[addYear:${tbl}] source fetch error:`, sourceRes.error);
+        continue;
+      }
+      const uniqueNames = [...new Set((sourceRes.data || []).map(i => i.name as string))];
       if (uniqueNames.length === 0) continue;
       const rows = newMonths.flatMap(m =>
         uniqueNames.map((name, idx) => ({
@@ -533,10 +614,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     state.yearConfigs.find(c => c.year === year) ?? { year, initialBalance: 0 };
 
   const getAvailableYears = (): number[] => {
-    const years = new Set<number>();
-    [...state.income, ...state.expenses, ...state.investments, ...state.savings]
-      .filter(i => i.amount !== 0)
-      .forEach(i => years.add(i.year));
+    const years = new Set<number>(availableYearsState);
     if (pendingYearRef.current !== null) years.add(pendingYearRef.current);
     return Array.from(years).sort((a, b) => b - a);
   };
